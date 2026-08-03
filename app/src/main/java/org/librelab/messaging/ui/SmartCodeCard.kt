@@ -48,8 +48,8 @@ fun SmartCodeCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            // Same background as the "撰写短信" FAB, no border.
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            // Original soft background, no border.
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
         Column(

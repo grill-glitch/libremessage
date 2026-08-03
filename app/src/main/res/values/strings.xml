@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Librelab 短信</string>
+    <string name="notification_channel_sms">新短信通知</string>
+    <string name="copy_code">复制验证码</string>
+    <string name="code_copied">验证码已复制到剪贴板</string>
+    <string name="mms_title">收到一条彩信</string>
+    <string name="mms_body">当前版本暂不支持查看彩信,请使用其他应用</string>
+    <string name="default_app_unavailable">系统未提供默认短信设置入口,请到 设置 → 应用 → 默认应用 中手动修改</string>
+</resources>

@@ -1,0 +1,575 @@
+package org.librelab.messaging.ui
+
+import android.Manifest
+import android.app.PendingIntent
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.telephony.SmsManager
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Arrow_back
+import com.composables.icons.materialsymbols.outlined.Attach_file
+import com.composables.icons.materialsymbols.outlined.Call
+import com.composables.icons.materialsymbols.outlined.Check
+import com.composables.icons.materialsymbols.outlined.Close
+import com.composables.icons.materialsymbols.outlined.Done_all
+import com.composables.icons.materialsymbols.outlined.Error
+import com.composables.icons.materialsymbols.outlined.More_vert
+import com.composables.icons.materialsymbols.outlined.Send
+import org.librelab.messaging.SmsSentReceiver
+import org.librelab.messaging.data.SendStatus
+import org.librelab.messaging.data.SmsMessage
+import org.librelab.messaging.data.SmsViewModel
+import org.librelab.messaging.util.MmsSender
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/**
+ * Conversation detail: received bubbles on the left, sent on the right,
+ * auto-scroll to the newest message, bottom input bar sends via SmsManager.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThreadDetailScreen(
+    threadId: Long,
+    address: String,
+    sender: String,
+    vm: SmsViewModel,
+    onBack: () -> Unit
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val messages = state.threadMessages
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var input by remember { mutableStateOf("") }
+    var pendingImage by remember { mutableStateOf<File?>(null) }
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val file = File(context.cacheDir, "pending_mms_${System.currentTimeMillis()}.jpg")
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { input.copyTo(it) }
+                }
+                pendingImage = file
+            } catch (e: Exception) {
+                Toast.makeText(context, "读取图片失败", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    BackHandler(onBack = onBack)
+
+    // Auto-scroll to the newest message on open and on new messages.
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.scrollToItem(messages.size - 1)
+    }
+
+    // When the user starts typing (input focused), jump to the newest
+    // message once. After that the list scrolls freely (history browsing
+    // must not be yanked back by IME insets flapping).
+    var inputFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(inputFocused) {
+        if (inputFocused && messages.isNotEmpty()) {
+            listState.scrollToItem(messages.size - 1)
+        }
+    }
+
+    Scaffold(
+        // adjustNothing + imePadding on the whole Scaffold: the window does
+        // not resize, so this lifts the entire layout (input bar AND message
+        // list) above the keyboard — no double padding, list stays scrollable.
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding(),
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        InitialAvatar(
+                            initial = sender.firstOrNull()?.toString() ?: "?",
+                            size = 36,
+                            container = MaterialTheme.colorScheme.primaryContainer,
+                            content = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = sender,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(MaterialSymbols.Outlined.Arrow_back, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            context.startActivity(
+                                Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(address)}"))
+                            )
+                        }
+                    ) {
+                        Icon(MaterialSymbols.Outlined.Call, contentDescription = "拨号", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    IconButton(onClick = {
+                        Toast.makeText(context, "更多功能开发中", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(MaterialSymbols.Outlined.More_vert, contentDescription = "更多", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        bottomBar = {
+            MessageInputBar(
+                value = input,
+                onValueChange = { input = it },
+                onFocusChanged = { inputFocused = it },
+                pendingImage = pendingImage,
+                onAttach = { imagePicker.launch("image/*") },
+                onRemoveImage = { pendingImage = null },
+                onSend = {
+                    val text = input.trim()
+                                    if (text.isEmpty() && pendingImage == null) return@MessageInputBar
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) !=
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        Toast.makeText(context, "无发送短信权限", Toast.LENGTH_SHORT).show()
+                        return@MessageInputBar
+                    }
+                    val image = pendingImage
+                    val ok: Boolean
+                    if (image != null) {
+                        // MMS: keep our own outbox copy; the sent callback flips
+                        // it to FAILED if the stack reports an error. Runs off
+                        // the UI thread because MMS data may need enabling first.
+                        val outboxId = -System.currentTimeMillis()
+                        val sentIntent = PendingIntent.getBroadcast(
+                            context,
+                            outboxId.toInt(),
+                            Intent(SmsSentReceiver.ACTION_SMS_SENT)
+                                .setPackage(context.packageName)
+                                .putExtra(SmsSentReceiver.EXTRA_TYPE, "mms")
+                                .putExtra(SmsSentReceiver.EXTRA_RECORD_ID, outboxId),
+                            PendingIntent.FLAG_IMMUTABLE
+                        )
+                        val scope2 = scope
+                        scope2.launch(Dispatchers.IO) {
+                            val sent = MmsSender.send(context, address, text, image, outboxId, sentIntent) != null
+                            withContext(Dispatchers.Main) {
+                                if (sent) {
+                                    pendingImage = null
+                                    input = ""
+                                    vm.refresh()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "彩信发送失败: 请允许 MMS 数据连接后重试",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                        return@MessageInputBar
+                    } else {
+                        // SMS: insert our own outbox row (the system does not write
+                        // one on this ROM), then flip its type via the sent callback.
+                        val recordId = vm.insertPendingSms(address, text)
+                        val sentIntent = PendingIntent.getBroadcast(
+                            context,
+                            recordId.toInt(),
+                            Intent(SmsSentReceiver.ACTION_SMS_SENT)
+                                .setPackage(context.packageName)
+                                .putExtra(SmsSentReceiver.EXTRA_TYPE, "sms")
+                                .putExtra(SmsSentReceiver.EXTRA_RECORD_ID, recordId),
+                            PendingIntent.FLAG_IMMUTABLE
+                        )
+                        ok = try {
+                            SmsManager.getDefault().sendTextMessage(address, null, text, sentIntent, null)
+                            true
+                        } catch (e: Exception) {
+                            vm.markSmsFailed(recordId)
+                            Toast.makeText(context, "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                            false
+                        }
+                    }
+                    if (ok) {
+                        pendingImage = null
+                        input = ""
+                        vm.refresh() // ContentObserver also fires; refresh re-loads the thread
+                    } else if (image != null) {
+                        Toast.makeText(context, "彩信发送失败", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(messages, key = { it.id }) { message ->
+                MessageBubble(message = message, myInitial = "我")
+            }
+        }
+    }
+}
+
+/** 32dp round initial avatar next to a bubble (36dp variant used in the top bar). */
+@Composable
+private fun InitialAvatar(
+    initial: String,
+    size: Int,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color
+) {
+    Surface(
+        shape = CircleShape,
+        color = container,
+        modifier = Modifier.size(size.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = initial,
+                style = MaterialTheme.typography.titleMedium,
+                color = content
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageBubble(message: SmsMessage, myInitial: String) {
+    val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.date))
+    val hasImages = message.imageUris.isNotEmpty()
+    if (message.isSent) {
+        // Sent — right aligned; images sit outside the bubble, bubble holds text+time
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Column(horizontalAlignment = Alignment.End) {
+                message.imageUris.forEach { uri ->
+                    MmsImage(uri)
+                }
+                if (message.body.isNotBlank()) {
+                    BubbleContent(
+                        message = message,
+                        time = time,
+                        sendStatus = message.sendStatus,
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        content = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                } else if (hasImages) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SendStatusIcon(message.sendStatus)
+                        Text(
+                            text = time,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            InitialAvatar(
+                initial = myInitial,
+                size = 32,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    } else {
+        // Received — left aligned; images outside the bubble
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            InitialAvatar(
+                initial = message.sender.firstOrNull()?.toString() ?: "?",
+                size = 32,
+                container = MaterialTheme.colorScheme.tertiaryContainer,
+                content = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.Start) {
+                message.imageUris.forEach { uri ->
+                    MmsImage(uri)
+                }
+                if (message.body.isNotBlank()) {
+                    BubbleContent(
+                        message = message,
+                        time = time,
+                        sendStatus = SendStatus.NONE,
+                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
+                        container = MaterialTheme.colorScheme.secondaryContainer,
+                        content = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                } else if (hasImages) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SendStatusIcon(message.sendStatus)
+                        Text(
+                            text = time,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** MMS image, rendered outside the bubble with a soft corner radius. */
+@Composable
+private fun MmsImage(uri: android.net.Uri) {
+    AsyncImage(
+        model = uri,
+        contentDescription = "图片消息",
+        modifier = Modifier
+            .padding(bottom = 6.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .sizeIn(maxWidth = 220.dp, maxHeight = 280.dp)
+    )
+}
+
+@Composable
+private fun BubbleContent(
+    message: SmsMessage,
+    time: String,
+    sendStatus: SendStatus,
+    shape: RoundedCornerShape,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color
+) {
+    Surface(shape = shape, color = container) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(
+                text = message.body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = content
+            )
+            Spacer(Modifier.size(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                SendStatusIcon(sendStatus)
+                Text(
+                    text = time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+    }
+}
+
+/** Delivery state icon next to the time of an outgoing bubble. */
+@Composable
+private fun SendStatusIcon(status: SendStatus) {
+    val icon = when (status) {
+        SendStatus.SENDING -> MaterialSymbols.Outlined.Check
+        SendStatus.SENT -> MaterialSymbols.Outlined.Done_all
+        SendStatus.FAILED -> MaterialSymbols.Outlined.Error
+        SendStatus.NONE -> return
+    }
+    val tint = when (status) {
+        SendStatus.FAILED -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.outline
+    }
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier
+            .size(14.dp)
+            .padding(end = 4.dp)
+    )
+}
+
+@Composable
+private fun MessageInputBar(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    pendingImage: File?,
+    onAttach: () -> Unit,
+    onRemoveImage: () -> Unit,
+    onSend: () -> Unit
+) {
+    val context = LocalContext.current
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        // The whole Scaffold rides above the keyboard (Scaffold imePadding),
+        // so this bar needs no extra padding.
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column {
+            // Pending attachment preview
+            if (pendingImage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = pendingImage,
+                        contentDescription = "待发送图片",
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = "图片附件",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = onRemoveImage) {
+                        Icon(MaterialSymbols.Outlined.Close, contentDescription = "移除图片", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onAttach) {
+                    Icon(MaterialSymbols.Outlined.Attach_file, contentDescription = "附件", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                // Pill-shaped input
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                ) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = "输入短信...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 14.dp)
+                                .align(Alignment.CenterStart)
+                        )
+                    }
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        textStyle = TextStyle(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = MaterialTheme.typography.bodyMedium.fontSize
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                            .heightIn(max = 96.dp)
+                            .onFocusChanged { onFocusChanged(it.isFocused) },
+                        maxLines = 4
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                FilledIconButton(
+                    onClick = onSend,
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(MaterialSymbols.Outlined.Send, contentDescription = "发送", modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+    }
+}

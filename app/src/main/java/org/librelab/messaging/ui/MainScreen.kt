@@ -336,7 +336,13 @@ private fun SmsListContent(
             }
         }
 
-        item { SmartCodeCard(message = state.latestCode, onCopy = onCopyCode) }
+        item {
+            SmartCodeCard(
+                message = state.latestCode,
+                allCodes = state.allCodes,
+                onCopy = onCopyCode
+            )
+        }
         item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
 
         val threads = state.visibleThreads

@@ -339,7 +339,8 @@ fun ThreadDetailScreen(
         }
     }
 
-    // Full-screen image viewer: pinch/double-tap to zoom, tap to dismiss.
+    // Full-screen image viewer: pinch/double-tap to zoom, single tap (no
+    // ripple) to dismiss.
     viewerUri?.let { uri ->
         Dialog(onDismissRequest = { viewerUri = null }) {
             var scale by remember { mutableFloatStateOf(1f) }
@@ -349,6 +350,7 @@ fun ThreadDetailScreen(
                     .background(Color.Black)
                     .pointerInput(Unit) {
                         detectTapGestures(
+                            onTap = { viewerUri = null },
                             onDoubleTap = {
                                 scale = if (scale > 1f) 1f else 2.5f
                             }
@@ -359,7 +361,6 @@ fun ThreadDetailScreen(
                             scale = (scale * zoom).coerceIn(1f, 6f)
                         }
                     }
-                    .clickable { viewerUri = null }
             ) {
                 AsyncImage(
                     model = uri,

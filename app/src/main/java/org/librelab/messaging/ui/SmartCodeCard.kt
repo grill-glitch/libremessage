@@ -15,16 +15,27 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,12 +49,15 @@ import org.librelab.messaging.util.formatRelativeTime
  * B. Smart Verification Card — pinned at the top of the list, shows the
  * newest real verification code extracted from the inbox.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmartCodeCard(
     message: SmsMessage?,
+    allCodes: List<SmsMessage> = emptyList(),
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showSheet by remember { mutableStateOf(false) }
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -84,11 +98,16 @@ fun SmartCodeCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Icon(
-                    imageVector = MaterialSymbols.Outlined.Chevron_right,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                IconButton(
+                    onClick = { showSheet = true },
+                    enabled = allCodes.isNotEmpty()
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Outlined.Chevron_right,
+                        contentDescription = "查看全部验证码",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             // Core code row
@@ -133,6 +152,97 @@ fun SmartCodeCard(
                     text = message?.let { formatRelativeTime(it.date) } ?: "",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+    }
+
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "所有验证码与取件码 (${allCodes.size})",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .sizeIn(maxHeight = 480.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(allCodes, key = { it.key }) { codeMsg ->
+                        CodeCardRow(codeMsg = codeMsg, onCopy = onCopy)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CodeCardRow(
+    codeMsg: SmsMessage,
+    onCopy: (String) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (codeMsg.codeLabel == "取件码") {
+                    MaterialSymbols.Outlined.Package_2
+                } else {
+                    MaterialSymbols.Outlined.Safety_check
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = codeMsg.merchantName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = codeMsg.code?.let(SmsParser::formatCode) ?: "",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Text(
+                    text = codeMsg.body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(
+                onClick = { codeMsg.code?.let(onCopy) },
+                enabled = codeMsg.hasCode
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Outlined.Content_copy,
+                    contentDescription = "复制",
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }

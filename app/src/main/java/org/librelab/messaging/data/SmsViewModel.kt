@@ -37,6 +37,10 @@ data class UiState(
             .filter { it.category == MessageCategory.CODE }
             .maxByOrNull { it.date }
 
+    /** All code/express messages in descending order (for the expanded card list). */
+    val allCodes: List<SmsMessage>
+        get() = messages.filter { it.category == MessageCategory.CODE }.sortedByDescending { it.date }
+
     /** Messages after applying filter chip + search query. */
     val visibleMessages: List<SmsMessage>
         get() {

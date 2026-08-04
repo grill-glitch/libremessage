@@ -76,6 +76,16 @@ object OutboxStore {
     /** Flip the delivery state of one outbox record (sent callback). */
     fun mark(context: Context, id: Long, failed: Boolean) {
         val list = all(context).map { if (it.id == id) it.copy(failed = failed) else it }
+        write(context, list)
+    }
+
+    /** Remove one outbox record (user deleted the message). */
+    fun remove(context: Context, id: Long) {
+        val list = all(context).filter { it.id != id }
+        write(context, list)
+    }
+
+    private fun write(context: Context, list: List<OutboxMms>) {
         try {
             file(context).writeText(toJson(list).toString())
         } catch (e: Exception) {

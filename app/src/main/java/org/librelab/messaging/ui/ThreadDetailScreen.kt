@@ -16,6 +16,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -45,13 +47,16 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +67,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -89,6 +97,7 @@ import org.librelab.messaging.data.SendStatus
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.util.MmsSender
+import org.librelab.messaging.util.OutboxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -314,32 +323,87 @@ fun ThreadDetailScreen(
                             if (saved) "已保存到相册" else "保存失败",
                             Toast.LENGTH_SHORT
                         ).show()
+                    },
+                    onDelete = { msg ->
+                        deleteMessage(context, msg)
+                        vm.refresh()
                     }
                 )
             }
         }
     }
 
-    // Full-screen image viewer: tap anywhere to dismiss.
+    // Full-screen image viewer: pinch/double-tap to zoom, tap to dismiss.
     viewerUri?.let { uri ->
         Dialog(onDismissRequest = { viewerUri = null }) {
+            var scale by remember { mutableFloatStateOf(1f) }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.92f))
+                    .background(Color.Black)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                scale = if (scale > 1f) 1f else 2.5f
+                            }
+                        )
+                    }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 6f)
+                        }
+                    }
                     .clickable { viewerUri = null }
             ) {
                 AsyncImage(
                     model = uri,
                     contentDescription = "图片",
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .fillMaxWidth()
-                        .padding(12.dp)
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
                 )
             }
         }
     }
+}
+
+/** Delete a message: system SMS/MMS rows, or the local outbox record. */
+private fun deleteMessage(context: Context, message: SmsMessage) {
+    try {
+        if (message.id < 0) {
+            // Outbox record (local JSON), negative synthetic id.
+            OutboxStore.remove(context, message.id)
+        } else if (message.isMms) {
+            context.contentResolver.delete(
+                android.net.Uri.parse("content://mms/${message.id}"), null, null
+            )
+        } else {
+            context.contentResolver.delete(
+                android.net.Uri.parse("content://sms/${message.id}"), null, null
+            )
+        }
+    } catch (e: Exception) {
+        Toast.makeText(context, "删除失败", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Share a message (text, or the first image for MMS) via the system chooser. */
+private fun shareMessage(context: Context, message: SmsMessage) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        if (message.imageUris.isNotEmpty()) {
+            type = "image/*"
+            putExtra(Intent.EXTRA_STREAM, message.imageUris.first())
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } else {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, message.body)
+        }
+    }
+    context.startActivity(Intent.createChooser(intent, "分享"))
 }
 
 /** Copy an MMS part into the gallery (Pictures/Librelab). */
@@ -396,10 +460,15 @@ private fun MessageBubble(
     message: SmsMessage,
     myInitial: String,
     onOpenImage: (android.net.Uri) -> Unit,
-    onSaveImage: (android.net.Uri) -> Unit
+    onSaveImage: (android.net.Uri) -> Unit,
+    onDelete: (SmsMessage) -> Unit
 ) {
     val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.date))
     val hasImages = message.imageUris.isNotEmpty()
+    var showMenu by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     if (message.isSent) {
         // Sent — right aligned; images sit outside the bubble, bubble holds text+time
         Row(
@@ -409,7 +478,7 @@ private fun MessageBubble(
         ) {
             Column(horizontalAlignment = Alignment.End) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, onOpenImage, onSaveImage)
+                    MmsImage(uri, onOpenImage, onLongClick = { showMenu = true })
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -418,7 +487,8 @@ private fun MessageBubble(
                         sendStatus = message.sendStatus,
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
                         container = MaterialTheme.colorScheme.primaryContainer,
-                        content = MaterialTheme.colorScheme.onPrimaryContainer
+                        content = MaterialTheme.colorScheme.onPrimaryContainer,
+                        onLongClick = { showMenu = true }
                     )
                 } else if (hasImages) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -456,7 +526,7 @@ private fun MessageBubble(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.Start) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, onOpenImage, onSaveImage)
+                    MmsImage(uri, onOpenImage, onLongClick = { showMenu = true })
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -465,7 +535,8 @@ private fun MessageBubble(
                         sendStatus = SendStatus.NONE,
                         shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
                         container = MaterialTheme.colorScheme.secondaryContainer,
-                        content = MaterialTheme.colorScheme.onSecondaryContainer
+                        content = MaterialTheme.colorScheme.onSecondaryContainer,
+                        onLongClick = { showMenu = true }
                     )
                 } else if (hasImages) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -481,16 +552,72 @@ private fun MessageBubble(
             }
         }
     }
+
+    // Long-press action menu: copy / share / save image / delete / cancel.
+    if (showMenu) {
+        AlertDialog(
+            onDismissRequest = { showMenu = false },
+            title = { Text("消息操作") },
+            text = {
+                Column {
+                    if (message.body.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                clipboard.setText(AnnotatedString(message.body))
+                                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                                showMenu = false
+                            }
+                        ) { Text("复制") }
+                    }
+                    TextButton(
+                        onClick = {
+                            shareMessage(context, message)
+                            showMenu = false
+                        }
+                    ) { Text("分享") }
+                    if (hasImages) {
+                        TextButton(
+                            onClick = {
+                                message.imageUris.firstOrNull()?.let(onSaveImage)
+                                showMenu = false
+                            }
+                        ) { Text("保存图片") }
+                    }
+                    TextButton(
+                        onClick = {
+                            showMenu = false
+                            confirmDelete = true
+                        }
+                    ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = { TextButton({ showMenu = false }) { Text("取消") } }
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("删除这条消息?") },
+            text = { Text("删除后不可恢复") },
+            confirmButton = {
+                TextButton({
+                    confirmDelete = false
+                    onDelete(message)
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton({ confirmDelete = false }) { Text("取消") } }
+        )
+    }
 }
 
 /** MMS image, rendered outside the bubble with a soft corner radius.
- * Tap to view full-screen; long-press to save to the gallery. */
+ * Tap to view full-screen; long-press opens the action menu. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MmsImage(
     uri: android.net.Uri,
     onOpenImage: (android.net.Uri) -> Unit,
-    onSaveImage: (android.net.Uri) -> Unit
+    onLongClick: () -> Unit
 ) {
     AsyncImage(
         model = uri,
@@ -501,7 +628,7 @@ private fun MmsImage(
             .sizeIn(maxWidth = 220.dp, maxHeight = 280.dp)
             .combinedClickable(
                 onClick = { onOpenImage(uri) },
-                onLongClick = { onSaveImage(uri) }
+                onLongClick = onLongClick
             )
     )
 }
@@ -514,21 +641,15 @@ private fun BubbleContent(
     sendStatus: SendStatus,
     shape: RoundedCornerShape,
     container: androidx.compose.ui.graphics.Color,
-    content: androidx.compose.ui.graphics.Color
+    content: androidx.compose.ui.graphics.Color,
+    onLongClick: () -> Unit
 ) {
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
     Surface(
         shape = shape,
         color = container,
         modifier = Modifier.combinedClickable(
             onClick = {},
-            onLongClick = {
-                if (message.body.isNotBlank()) {
-                    clipboard.setText(AnnotatedString(message.body))
-                    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
-                }
-            }
+            onLongClick = onLongClick
         )
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {

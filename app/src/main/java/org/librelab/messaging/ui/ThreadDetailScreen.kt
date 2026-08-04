@@ -48,6 +48,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
@@ -67,8 +69,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -465,10 +471,7 @@ private fun MessageBubble(
 ) {
     val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.date))
     val hasImages = message.imageUris.isNotEmpty()
-    var showMenu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
     if (message.isSent) {
         // Sent — right aligned; images sit outside the bubble, bubble holds text+time
         Row(
@@ -478,7 +481,7 @@ private fun MessageBubble(
         ) {
             Column(horizontalAlignment = Alignment.End) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, onOpenImage, onLongClick = { showMenu = true })
+                    MmsImage(uri, message, onOpenImage, onSaveImage, onRequestDelete = { confirmDelete = true })
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -488,7 +491,7 @@ private fun MessageBubble(
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
                         container = MaterialTheme.colorScheme.primaryContainer,
                         content = MaterialTheme.colorScheme.onPrimaryContainer,
-                        onLongClick = { showMenu = true }
+                        onRequestDelete = { confirmDelete = true }
                     )
                 } else if (hasImages) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -526,7 +529,7 @@ private fun MessageBubble(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.Start) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, onOpenImage, onLongClick = { showMenu = true })
+                    MmsImage(uri, message, onOpenImage, onSaveImage, onRequestDelete = { confirmDelete = true })
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -536,7 +539,7 @@ private fun MessageBubble(
                         shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
                         container = MaterialTheme.colorScheme.secondaryContainer,
                         content = MaterialTheme.colorScheme.onSecondaryContainer,
-                        onLongClick = { showMenu = true }
+                        onRequestDelete = { confirmDelete = true }
                     )
                 } else if (hasImages) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -553,47 +556,6 @@ private fun MessageBubble(
         }
     }
 
-    // Long-press action menu: copy / share / save image / delete / cancel.
-    if (showMenu) {
-        AlertDialog(
-            onDismissRequest = { showMenu = false },
-            title = { Text("消息操作") },
-            text = {
-                Column {
-                    if (message.body.isNotBlank()) {
-                        TextButton(
-                            onClick = {
-                                clipboard.setText(AnnotatedString(message.body))
-                                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
-                                showMenu = false
-                            }
-                        ) { Text("复制") }
-                    }
-                    TextButton(
-                        onClick = {
-                            shareMessage(context, message)
-                            showMenu = false
-                        }
-                    ) { Text("分享") }
-                    if (hasImages) {
-                        TextButton(
-                            onClick = {
-                                message.imageUris.firstOrNull()?.let(onSaveImage)
-                                showMenu = false
-                            }
-                        ) { Text("保存图片") }
-                    }
-                    TextButton(
-                        onClick = {
-                            showMenu = false
-                            confirmDelete = true
-                        }
-                    ) { Text("删除", color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = { TextButton({ showMenu = false }) { Text("取消") } }
-        )
-    }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -611,29 +573,44 @@ private fun MessageBubble(
 }
 
 /** MMS image, rendered outside the bubble with a soft corner radius.
- * Tap to view full-screen; long-press opens the action menu. */
-@OptIn(ExperimentalFoundationApi::class)
+ * Tap to view full-screen; long-press pops the action menu at the touch. */
 @Composable
 private fun MmsImage(
     uri: android.net.Uri,
+    message: SmsMessage,
     onOpenImage: (android.net.Uri) -> Unit,
-    onLongClick: () -> Unit
+    onSaveImage: (android.net.Uri) -> Unit,
+    onRequestDelete: () -> Unit
 ) {
-    AsyncImage(
-        model = uri,
-        contentDescription = "图片消息",
-        modifier = Modifier
-            .padding(bottom = 6.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .sizeIn(maxWidth = 220.dp, maxHeight = 280.dp)
-            .combinedClickable(
-                onClick = { onOpenImage(uri) },
-                onLongClick = onLongClick
+    var menuAt by remember { mutableStateOf<Offset?>(null) }
+    Box {
+        AsyncImage(
+            model = uri,
+            contentDescription = "图片消息",
+            modifier = Modifier
+                .padding(bottom = 6.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .sizeIn(maxWidth = 220.dp, maxHeight = 280.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { onOpenImage(uri) },
+                        onLongPress = { menuAt = it }
+                    )
+                }
+        )
+        menuAt?.let {
+            MessageActionMenu(
+                offset = it,
+                message = message,
+                hasImages = true,
+                onDismiss = { menuAt = null },
+                onSaveImage = onSaveImage,
+                onRequestDelete = onRequestDelete
             )
-    )
+        }
+    }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BubbleContent(
     message: SmsMessage,
@@ -642,34 +619,103 @@ private fun BubbleContent(
     shape: RoundedCornerShape,
     container: androidx.compose.ui.graphics.Color,
     content: androidx.compose.ui.graphics.Color,
-    onLongClick: () -> Unit
+    onRequestDelete: () -> Unit
 ) {
-    Surface(
-        shape = shape,
-        color = container,
-        modifier = Modifier.combinedClickable(
-            onClick = {},
-            onLongClick = onLongClick
-        )
-    ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text(
-                text = message.body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = content
-            )
-            Spacer(Modifier.size(4.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                SendStatusIcon(sendStatus)
-                Text(
-                    text = time,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
+    var menuAt by remember { mutableStateOf<Offset?>(null) }
+    Box {
+        Surface(
+            shape = shape,
+            color = container,
+            modifier = Modifier.pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = {},
+                    onLongPress = { menuAt = it }
                 )
             }
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Text(
+                    text = message.body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = content
+                )
+                Spacer(Modifier.size(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    SendStatusIcon(sendStatus)
+                    Text(
+                        text = time,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        }
+        menuAt?.let {
+            MessageActionMenu(
+                offset = it,
+                message = message,
+                hasImages = false,
+                onDismiss = { menuAt = null },
+                onSaveImage = {},
+                onRequestDelete = onRequestDelete
+            )
+        }
+    }
+}
+
+/** Compact action menu popped at the long-press position; tap outside dismisses. */
+@Composable
+private fun MessageActionMenu(
+    offset: Offset,
+    message: SmsMessage,
+    hasImages: Boolean,
+    onDismiss: () -> Unit,
+    onSaveImage: (android.net.Uri) -> Unit,
+    onRequestDelete: () -> Unit
+) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Popup(
+        offset = IntOffset(offset.x.roundToInt(), offset.y.roundToInt()),
+        onDismissRequest = onDismiss
+    ) {
+        DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
+            if (message.body.isNotBlank()) {
+                DropdownMenuItem(
+                    text = { Text("复制") },
+                    onClick = {
+                        clipboard.setText(AnnotatedString(message.body))
+                        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("分享") },
+                onClick = {
+                    shareMessage(context, message)
+                    onDismiss()
+                }
+            )
+            if (hasImages) {
+                DropdownMenuItem(
+                    text = { Text("保存图片") },
+                    onClick = {
+                        message.imageUris.firstOrNull()?.let(onSaveImage)
+                        onDismiss()
+                    }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    onDismiss()
+                    onRequestDelete()
+                }
+            )
         }
     }
 }

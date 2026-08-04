@@ -321,7 +321,9 @@ class SmsRepository(private val context: Context) {
                 }
                 val isRead = c.getInt(readCol) != 0
                 val parts = readMmsParts(id)
-                var address = readMmsAddress(id) ?: ""
+                // Sent MMS: the peer is the TO (type=151) row — the FROM row
+                // holds OUR OWN number. Received MMS: peer is FROM (137).
+                var address = readMmsAddress(id, sent = isSent) ?: ""
                 // Some privacy tooling stores the MMS sender redacted (e.g.
                 // "+861****3748"); fall back to the thread's SMS address.
                 if (!isUsableAddress(address)) {
@@ -370,14 +372,19 @@ class SmsRepository(private val context: Context) {
         return MmsParts(text, images)
     }
 
-    /** Sender address of one MMS (addr row with type=137 = FROM). */
-    private fun readMmsAddress(mmsId: Long): String? {
+    /**
+     * Peer address of one MMS: FROM (type=137) for received messages, TO
+     * (type=151) for sent ones. Using FROM on a sent MMS would return our
+     * own number and make the conversation look like a chat with ourselves.
+     */
+    private fun readMmsAddress(mmsId: Long, sent: Boolean): String? {
+        val wantType = if (sent) 151 else 137
         var address: String? = null
         resolver.query(Uri.parse("content://mms/$mmsId/addr"), null, null, null, null)?.use { c ->
             val addrCol = c.getColumnIndexOrThrow("address")
             val typeCol = c.getColumnIndexOrThrow("type")
             while (c.moveToNext()) {
-                if (c.getInt(typeCol) == 137) {
+                if (c.getInt(typeCol) == wantType) {
                     address = c.getString(addrCol)
                     break
                 }

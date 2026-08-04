@@ -568,9 +568,9 @@ private fun SmsListContent(
             }
         }
 
-        // 验证码/包裹 filters: the messages themselves become cards.
+        // 验证码 filter: pure verification codes only (pickup codes are 包裹).
         if (state.filter == SmsFilter.CODE) {
-            val codes = state.allCodeEntries
+            val codes = state.codeEntries
             if (codes.isEmpty()) {
                 item { EmptyBox("暂无验证码短信") }
             } else {

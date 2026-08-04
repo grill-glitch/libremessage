@@ -99,6 +99,11 @@ object SmsParser {
 
     fun classify(body: String, hasContact: Boolean, archived: Boolean): MessageCategory {
         if (archived) return MessageCategory.ARCHIVED
+        // Express pickup messages (凭/取货码 X-X-X at 驿站) belong to 包裹,
+        // NOT 验证码 — keep the two filters clean.
+        if (body.contains("取件码") || body.contains("取货码") ||
+            (body.contains("驿站") && EXPRESS_CODE_PATTERN.containsMatchIn(body))
+        ) return MessageCategory.PACKAGE
         if (extractCode(body) != null) return MessageCategory.CODE
         if (AD_KEYWORDS.any { body.contains(it) }) return MessageCategory.AD
         if (BANK_KEYWORDS.any { body.contains(it) }) return MessageCategory.BANK

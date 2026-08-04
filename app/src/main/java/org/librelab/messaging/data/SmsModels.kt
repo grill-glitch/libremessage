@@ -13,7 +13,8 @@ import com.composables.icons.materialsymbols.outlined.Shield
 
 /** Category assigned by [SmsParser] to every real message. */
 enum class MessageCategory {
-    CODE,       // 验证码 / 取件码 / 校验码
+    CODE,       // 验证码 / 校验码
+    PACKAGE,    // 取件码 / 取货码 (快递驿站)
     AD,         // 广告营销
     BANK,       // 银行扣款 / 消费
     ECOMMERCE,  // 京东 / 顺丰 / 快递
@@ -26,6 +27,7 @@ enum class MessageCategory {
     val icon: ImageVector
         get() = when (this) {
             CODE -> MaterialSymbols.Outlined.Shield
+            PACKAGE -> MaterialSymbols.Outlined.Box
             AD -> MaterialSymbols.Outlined.Campaign
             BANK -> MaterialSymbols.Outlined.Account_balance
             ECOMMERCE -> MaterialSymbols.Outlined.Box
@@ -50,10 +52,8 @@ enum class SmsFilter(val label: String) {
     fun matches(category: MessageCategory, body: String = ""): Boolean = when (this) {
         ALL -> category != MessageCategory.ARCHIVED
         CODE -> category == MessageCategory.CODE
-        // Express pickup SMS are CODE (取件码) — also surface them here so the
-        // 包裹 filter shows real conversations, not just the banner.
-        PACKAGE -> category == MessageCategory.ECOMMERCE ||
-            (category == MessageCategory.CODE && SmsParser.codeLabel(body) == "取件码")
+        // Express pickup SMS are PACKAGE — never mixed into the 验证码 filter.
+        PACKAGE -> category == MessageCategory.PACKAGE
         AD -> category == MessageCategory.AD
         ARCHIVED -> category == MessageCategory.ARCHIVED
     }

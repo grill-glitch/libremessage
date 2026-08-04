@@ -54,6 +54,14 @@ data class UiState(
      * are split per cabinet number: 【多多代收点】…取货码1-3-9448、5-4-3216
      * yields two entries (one per parcel). */
     val allCodeEntries: List<SmsMessage>
+        get() = messages.filter { it.category == MessageCategory.CODE || it.category == MessageCategory.PACKAGE }
+            .flatMap { msg ->
+                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
+            }
+            .sortedByDescending { it.date }
+
+    /** Pure verification codes (no pickup codes) — the 验证码 filter list. */
+    val codeEntries: List<SmsMessage>
         get() = messages.filter { it.category == MessageCategory.CODE }
             .flatMap { msg ->
                 SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
@@ -61,14 +69,10 @@ data class UiState(
             .sortedByDescending { it.date }
 
     private val codeMessages: List<SmsMessage>
-        get() = messages.filter {
-            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "验证码"
-        }
+        get() = messages.filter { it.category == MessageCategory.CODE }
 
     private val pickupMessages: List<SmsMessage>
-        get() = messages.filter {
-            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "取件码"
-        }
+        get() = messages.filter { it.category == MessageCategory.PACKAGE }
 
     /** Messages after applying filter chip + search query. */
     val visibleMessages: List<SmsMessage>

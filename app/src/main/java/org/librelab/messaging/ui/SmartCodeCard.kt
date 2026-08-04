@@ -8,9 +8,6 @@ import com.composables.icons.materialsymbols.outlined.Safety_check
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
@@ -241,7 +239,6 @@ internal fun CodeCardRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min)
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -256,7 +253,13 @@ internal fun CodeCardRow(
                 modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f).fillMaxHeight()) {
+            // Minimum height so the elastic spacer can push the
+            // time + 原始短信 row to the bottom edge of the card.
+            Column(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = 96.dp)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = codeMsg.merchantName,

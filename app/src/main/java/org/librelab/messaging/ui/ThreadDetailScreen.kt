@@ -57,6 +57,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -239,10 +240,24 @@ fun ThreadDetailScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     } else if (isNewThread) {
-                        Text(
-                            text = "新短信",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                        // Recipient field lives in the top bar itself (the
+                        // "新短信" title spot); the contact list renders right
+                        // below the bar.
+                        OutlinedTextField(
+                            value = newNumber,
+                            onValueChange = { newNumber = it },
+                            placeholder = { Text("新短信") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(numberFocus)
                         )
                     } else {
                         val titleText = if (isNewThread) newNumber else sender
@@ -328,12 +343,15 @@ fun ThreadDetailScreen(
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
-                    } else if (!isNewThread) {
+                    } else {
                         IconButton(
                             onClick = {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(address)}"))
-                                )
+                                val dial = if (isNewThread) newNumber else address
+                                if (dial.isNotBlank()) {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(dial)}"))
+                                    )
+                                }
                             }
                         ) {
                             Icon(MaterialSymbols.Outlined.Call, contentDescription = "拨号", tint = MaterialTheme.colorScheme.onSurface)
@@ -444,59 +462,43 @@ fun ThreadDetailScreen(
                 .padding(padding)
         ) {
             if (isNewThread) {
-                // New thread: recipient field (auto-focused) + contact
-                // picker live at the top of the chat view; the conversation
-                // area and input bar stay visible below.
-                Column(
+                // Contact picker below the top bar (the recipient field
+                // itself lives in the bar); filters by the typed query and
+                // shows all contacts A-Z when empty.
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .heightIn(max = 220.dp)
                 ) {
-                    OutlinedTextField(
-                        value = newNumber,
-                        onValueChange = { newNumber = it },
-                        label = { Text("输入号码或选择联系人") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(numberFocus)
-                    )
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 220.dp)
-                    ) {
-                        if (filteredContacts.isEmpty()) {
-                            item {
+                    if (filteredContacts.isEmpty()) {
+                        item {
+                            Text(
+                                text = "无匹配联系人",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    } else {
+                        items(filteredContacts, key = { (it.number ?: "") + it.name }) { contact ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { contact.number?.let { newNumber = it } }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = "无匹配联系人",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(vertical = 8.dp)
+                                    text = contact.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
                                 )
-                            }
-                        } else {
-                            items(filteredContacts, key = { (it.number ?: "") + it.name }) { contact ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { contact.number?.let { newNumber = it } }
-                                        .padding(vertical = 8.dp, horizontal = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                contact.number?.let {
                                     Text(
-                                        text = contact.name,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        modifier = Modifier.weight(1f)
+                                        text = it,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    contact.number?.let {
-                                        Text(
-                                            text = it,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
                                 }
                             }
                         }

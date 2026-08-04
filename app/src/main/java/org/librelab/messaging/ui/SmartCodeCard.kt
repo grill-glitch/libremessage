@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -29,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -43,7 +45,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsParser
-import org.librelab.messaging.util.formatRelativeTime
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
+/** Absolute send time: today → HH:mm, older → MM-dd HH:mm. */
+private fun formatSendTime(date: Long): String {
+    val cal = Calendar.getInstance().apply { timeInMillis = date }
+    val now = Calendar.getInstance()
+    val sameDay = cal.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
+        cal.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
+    val fmt = if (sameDay) SimpleDateFormat("HH:mm", Locale.getDefault())
+    else SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+    return fmt.format(Date(date))
+}
 
 /**
  * B. Smart Verification Card — pinned at the top of the list, shows the
@@ -55,6 +71,7 @@ fun SmartCodeCard(
     message: SmsMessage?,
     allCodes: List<SmsMessage> = emptyList(),
     onCopy: (String) -> Unit,
+    onOpenOriginal: (SmsMessage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showSheet by remember { mutableStateOf(false) }
@@ -137,7 +154,7 @@ fun SmartCodeCard(
                 }
             }
 
-            // Footer row
+            // Footer row: body, absolute send time, open-original button.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = message?.body ?: "暂无验证码短信",
@@ -149,10 +166,18 @@ fun SmartCodeCard(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = message?.let { formatRelativeTime(it.date) } ?: "",
+                    text = message?.let { formatSendTime(it.date) } ?: "",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
+                Spacer(Modifier.width(8.dp))
+                TextButton(
+                    onClick = { message?.let(onOpenOriginal) },
+                    enabled = message != null,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("原始短信", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

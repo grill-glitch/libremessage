@@ -75,6 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.librelab.messaging.R
 import org.librelab.messaging.data.SmsFilter
+import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsThreadItem
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.data.UiState
@@ -283,6 +284,9 @@ fun MainScreen(
                 state = state,
                 onFilter = vm::setFilter,
                 onCopyCode = { code -> copyCode(context, code) },
+                onOpenOriginal = { msg ->
+                    selectedThread = SmsThreadItem(msg, 0, 1)
+                },
                 onRequestPermission = {
                     permLauncher.launch(REQUIRED_PERMISSIONS)
                 },
@@ -319,6 +323,7 @@ private fun SmsListContent(
     onRequestPermission: () -> Unit,
     onSetDefaultApp: () -> Unit,
     onOpenThread: (SmsThreadItem) -> Unit,
+    onOpenOriginal: (SmsMessage) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -350,7 +355,8 @@ private fun SmsListContent(
             SmartCodeCard(
                 message = state.latestCode,
                 allCodes = state.allCodeEntries,
-                onCopy = onCopyCode
+                onCopy = onCopyCode,
+                onOpenOriginal = onOpenOriginal
             )
         }
         item { FilterChipRow(selected = state.filter, onSelect = onFilter) }

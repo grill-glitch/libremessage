@@ -22,8 +22,15 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Telephony
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -199,18 +206,6 @@ fun MainScreen(
             initialNumber = target.number,
             initialBody = target.body,
             onBack = { composeTarget = null }
-        )
-        return
-    }
-
-    // Full-screen settings page.
-    if (state.showSettings) {
-        SettingsScreen(
-            isDefaultSmsApp = state.isDefaultSmsApp,
-            showAdsInAll = state.showAdsInAll,
-            onSetDefaultApp = onSetDefaultApp,
-            onToggleAdsInAll = { vm.setShowAdsInAll(it) },
-            onBack = { vm.setShowSettings(false) }
         )
         return
     }
@@ -422,6 +417,28 @@ fun MainScreen(
                     .fillMaxSize()
             )
         }
+    }
+
+    // Settings as an overlay page: slides in from the right and, on back,
+    // slides back out — a predictable push/pop transition.
+    // System back also closes it (with the slide-out animation).
+    if (state.showSettings) {
+        BackHandler { vm.setShowSettings(false) }
+    }
+    AnimatedVisibility(
+        visible = state.showSettings,
+        enter = slideInHorizontally(animationSpec = tween(300)) { it } +
+            fadeIn(animationSpec = tween(300)),
+        exit = slideOutHorizontally(animationSpec = tween(300)) { it } +
+            fadeOut(animationSpec = tween(300))
+    ) {
+        SettingsScreen(
+            isDefaultSmsApp = state.isDefaultSmsApp,
+            showAdsInAll = state.showAdsInAll,
+            onSetDefaultApp = onSetDefaultApp,
+            onToggleAdsInAll = { vm.setShowAdsInAll(it) },
+            onBack = { vm.setShowSettings(false) }
+        )
     }
 }
 

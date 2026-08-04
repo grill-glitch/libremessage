@@ -10,6 +10,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,9 +19,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -55,8 +60,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -136,13 +143,18 @@ fun ThreadDetailScreen(
         }
     }
 
+    // IME lift: the message list and the input bar move together, translated
+    // by the animated keyboard height — synchronous movement, no resize.
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val imeOffset by animateIntAsState(
+        targetValue = imeBottom,
+        animationSpec = tween(durationMillis = 220),
+        label = "imeLift"
+    )
+
     Scaffold(
-        // adjustNothing + imePadding on the whole Scaffold: the window does
-        // not resize, so this lifts the entire layout (input bar AND message
-        // list) above the keyboard — no double padding, list stays scrollable.
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding(),
+        modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
@@ -191,11 +203,17 @@ fun ThreadDetailScreen(
             )
         },
         bottomBar = {
-            MessageInputBar(
-                value = input,
-                onValueChange = { input = it },
-                onFocusChanged = { inputFocused = it },
-                pendingImage = pendingImage,
+            // The input bar rides the keyboard: lifted by the IME offset.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset { IntOffset(0, -imeOffset) }
+            ) {
+                MessageInputBar(
+                    value = input,
+                    onValueChange = { input = it },
+                    onFocusChanged = { inputFocused = it },
+                    pendingImage = pendingImage,
                 onAttach = { imagePicker.launch("image/*") },
                 onRemoveImage = { pendingImage = null },
                 onSend = {
@@ -271,19 +289,27 @@ fun ThreadDetailScreen(
                         Toast.makeText(context, "彩信发送失败", Toast.LENGTH_SHORT).show()
                     }
                 }
-            )
+                )
+            }
         }
     ) { padding ->
-        LazyColumn(
-            state = listState,
+        // The message list rides with the input bar: same IME offset.
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .offset { IntOffset(0, -imeOffset) }
         ) {
-            items(messages, key = { it.id }) { message ->
-                MessageBubble(message = message, myInitial = "我")
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(messages, key = { it.id }) { message ->
+                    MessageBubble(message = message, myInitial = "我")
+                }
             }
         }
     }

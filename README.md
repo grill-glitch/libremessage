@@ -32,13 +32,24 @@ Compose. A clean, modern SMS client with no Google proprietary code.
 
 ## Build
 
+Two flavors:
+
+| Flavor | Network | Anti-spam |
+|---|---|---|
+| `libre` | fully offline (no INTERNET permission) | none |
+| `standard` | online | MIUI yellow-page number marks + icons |
+
 ```bash
 # Release signing (optional, gitignored):
 #   keystore.properties -> storeFile, storePassword, keyAlias, keyPassword
-./gradlew :app:assembleRelease
+./gradlew :app:assembleLibreRelease     # offline build
+./gradlew :app:assembleStandardRelease  # online build with number marking
 ```
 
-APK output: `app/build/outputs/apk/release/app-release.apk`
+APK output: `app/build/outputs/apk/<flavor>/release/app-<flavor>-release.apk`
+
+> `standard` embeds a Kotlin port of the [mi-anti-spam](https://github.com/grill-glitch/mi-anti-spam)
+> lookup (MIUI yellow-page caller-ID / number marking). Educational use only.
 
 ## Credits
 

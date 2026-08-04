@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- standard flavor: online build — grants INTERNET for the mi-anti-spam
+     number-marking lookup. The main manifest stays network-free; this
+     permission is merged in only for this flavor. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+</manifest>

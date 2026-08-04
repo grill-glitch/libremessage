@@ -506,6 +506,7 @@ private fun HomeScreen(
                 onOpenOriginal = { msg ->
                     onOpenThread(SmsThreadItem(msg, 0, 1))
                 },
+                onLookupMark = vm::lookupMark,
                 selectionMode = selectionMode,
                 selectedIds = selectedIds,
                 onToggleSelect = { t ->
@@ -545,6 +546,7 @@ private fun SmsListContent(
     onSetDefaultApp: () -> Unit,
     onOpenThread: (SmsThreadItem) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit,
+    onLookupMark: (String) -> Unit = {},
     selectionMode: Boolean = false,
     selectedIds: Set<Long> = emptySet(),
     onToggleSelect: (SmsThreadItem) -> Unit = {},
@@ -629,7 +631,9 @@ private fun SmsListContent(
                             if (selectionMode) onToggleSelect(thread) else onOpenThread(thread)
                         },
                         onLongClick = { onLongPress(thread) },
-                        selected = thread.message.threadId in selectedIds
+                        selected = thread.message.threadId in selectedIds,
+                        mark = state.marks[thread.message.address],
+                        onLookupMark = onLookupMark
                     )
                 }
             }

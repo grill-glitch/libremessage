@@ -21,8 +21,24 @@ android {
         applicationId = "org.librelab.messaging"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.1.2"
+        versionCode = 5
+        versionName = "1.2.0"
+    }
+
+    flavorDimensions += "network"
+    productFlavors {
+        // Fully offline build: no INTERNET permission, no anti-spam lookup.
+        // The app is pure local SMS/MMS — nothing ever touches the network.
+        create("libre") {
+            dimension = "network"
+            manifestPlaceholders["enableAntiSpam"] = "false"
+        }
+        // Online build: adds mi-anti-spam (MIUI yellow-page) number marking
+        // and icon lookup. Requires INTERNET.
+        create("standard") {
+            dimension = "network"
+            manifestPlaceholders["enableAntiSpam"] = "true"
+        }
     }
 
     signingConfigs {

@@ -32,7 +32,9 @@ data class UiState(
     val loading: Boolean = true,
     val showAdsInAll: Boolean = false,
     val notifyAds: Boolean = false,
-    val autoCopyCode: Boolean = true
+    val autoCopyCode: Boolean = true,
+    /** Anti-spam marks by address (standard flavor only; empty elsewhere). */
+    val marks: Map<String, org.librelab.messaging.antispam.NumberMark> = emptyMap()
 ) {
     /** Latest code/express message pinned to the smart banner. */
     val latestCode: SmsMessage?
@@ -236,6 +238,16 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     fun setTab(tab: Int) {
         _state.update { it.copy(tab = tab) }
         if (tab == 1) loadContacts()
+    }
+
+    /** Look up anti-spam marks for an address (standard flavor only). */
+    fun lookupMark(address: String) {
+        if (address.isBlank() || _state.value.marks.containsKey(address)) return
+        if (!org.librelab.messaging.antispam.AntiSpam.service.isAvailable()) return
+        viewModelScope.launch {
+            val mark = org.librelab.messaging.antispam.AntiSpam.service.lookup(address) ?: return@launch
+            _state.update { it.copy(marks = it.marks + (address to mark)) }
+        }
     }
 
     override fun onCleared() {

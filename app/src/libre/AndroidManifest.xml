@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- libre flavor: fully offline — explicitly no permissions added here.
+     The main manifest contains no INTERNET permission either, so this
+     build cannot open any network socket. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+</manifest>

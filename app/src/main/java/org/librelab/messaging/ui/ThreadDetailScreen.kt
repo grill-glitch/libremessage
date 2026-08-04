@@ -163,6 +163,8 @@ fun ThreadDetailScreen(
         if (isNewThread) {
             vm.loadContacts()
             numberFocus.requestFocus()
+        } else if (address.isNotBlank()) {
+            vm.lookupMark(address)
         }
     }
     val filteredContacts = remember(newNumber, contacts) {
@@ -267,21 +269,54 @@ fun ThreadDetailScreen(
                         )
                     } else {
                         val titleText = if (isNewThread) newNumber else sender
+                        val mark = state.marks[address]
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            InitialAvatar(
-                                initial = titleText.firstOrNull()?.toString() ?: "?",
-                                size = 36,
-                                container = MaterialTheme.colorScheme.primaryContainer,
-                                content = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = titleText,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            if (mark?.iconUrl != null) {
+                                // Yellow-page business icon (standard flavor).
+                                androidx.compose.foundation.layout.Box(
+                                    modifier = Modifier.size(36.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    coil.compose.AsyncImage(
+                                        model = mark.iconUrl,
+                                        contentDescription = null,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                    )
+                                }
+                                Spacer(Modifier.width(10.dp))
+                            } else {
+                                InitialAvatar(
+                                    initial = titleText.firstOrNull()?.toString() ?: "?",
+                                    size = 36,
+                                    container = MaterialTheme.colorScheme.primaryContainer,
+                                    content = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Spacer(Modifier.width(10.dp))
+                            }
+                            Column {
+                                Text(
+                                    text = titleText,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                mark?.let { m ->
+                                    val label = m.businessName ?: m.category
+                                    if (!label.isNullOrBlank()) {
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 },

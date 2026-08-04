@@ -24,13 +24,24 @@ Google 专有代码。
 
 ## 构建
 
+两个风味:
+
+| 风味 | 联网 | 号码标记 |
+|---|---|---|
+| `libre` | 完全离线(无 INTERNET 权限) | 无 |
+| `standard` | 联网 | MIUI 黄页号码标记 + 图标 |
+
 ```bash
 # Release 签名(可选,已 gitignore):
 #   keystore.properties -> storeFile, storePassword, keyAlias, keyPassword
-./gradlew :app:assembleRelease
+./gradlew :app:assembleLibreRelease     # 离线版
+./gradlew :app:assembleStandardRelease  # 联网版,含号码标记
 ```
 
-APK 输出:`app/build/outputs/apk/release/app-release.apk`
+APK 输出:`app/build/outputs/apk/<flavor>/release/app-<flavor>-release.apk`
+
+> `standard` 内置 [mi-anti-spam](https://github.com/grill-glitch/mi-anti-spam)
+> 的 Kotlin 移植(MIUI 黄页来电识别 / 号码标记查询),仅供学习交流使用。
 
 ## 致谢
 

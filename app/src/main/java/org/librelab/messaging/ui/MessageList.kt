@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,10 +54,16 @@ fun MessageItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: () -> Unit = {},
-    selected: Boolean = false
+    selected: Boolean = false,
+    mark: org.librelab.messaging.antispam.NumberMark? = null,
+    onLookupMark: (String) -> Unit = {}
 ) {
     val message = thread.message
     val context = LocalContext.current
+    // Ask the ViewModel for this sender's anti-spam mark (standard flavor).
+    LaunchedEffect(message.address) {
+        onLookupMark(message.address)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -83,13 +90,30 @@ fun MessageItem(
         Spacer(Modifier.width(12.dp))
 
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-            Text(
-                text = message.sender,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = message.sender,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                // Anti-spam mark badge (standard flavor): 广告推销 / 快递外卖 …
+                mark?.let { m ->
+                    val label = m.businessName ?: m.category
+                    if (!label.isNullOrBlank()) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(2.dp))
             Text(
                 text = if (message.imageUris.isNotEmpty()) {

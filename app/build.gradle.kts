@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 // Release signing: read from keystore.properties (gitignored). When the
@@ -83,6 +84,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     // Jetpack Navigation Compose: framework-managed back stack + transitions
     implementation("androidx.navigation:navigation-compose:2.9.8")
+    // Type-safe routes (@Serializable) for the NavHost
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

@@ -12,7 +12,6 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.telephony.SmsManager
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -168,7 +167,9 @@ fun ThreadDetailScreen(
         }
     }
 
-    BackHandler(onBack = onBack)
+    // System back is managed by Navigation Compose (predictive back gesture);
+    // the top-bar arrow uses onBack. No BackHandler here — it would break
+    // the framework-driven predictive back animation.
 
     // reverseLayout: index 0 (newest) renders at the bottom, right above the
     // input bar; the default position already shows the newest messages, so

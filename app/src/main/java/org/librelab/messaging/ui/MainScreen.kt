@@ -26,16 +26,14 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.navigation.NavType
+import androidx.navigation.toRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,6 +100,19 @@ import org.librelab.messaging.data.UiState
 
 private data class ComposeTarget(val number: String, val body: String)
 
+/** Type-safe navigation routes (Navigation Compose 2.8+ serializable API). */
+@kotlinx.serialization.Serializable
+private object HomeRoute
+
+@kotlinx.serialization.Serializable
+private data class ThreadRoute(val threadId: Long, val address: String, val sender: String)
+
+@kotlinx.serialization.Serializable
+private object SettingsRoute
+
+@kotlinx.serialization.Serializable
+private data class ComposeRoute(val number: String = "", val body: String = "")
+
 private val REQUIRED_PERMISSIONS = arrayOf(
     Manifest.permission.READ_SMS,
     Manifest.permission.RECEIVE_SMS,
@@ -123,68 +134,68 @@ fun MainScreen(
     // was started with a number/body (e.g. share intent).
     LaunchedEffect(Unit) {
         if (initialNumber.isNotBlank() || initialBody.isNotBlank()) {
-            navController.navigate(
-                "compose?number=${Uri.encode(initialNumber)}&body=${Uri.encode(initialBody)}"
-            )
+            navController.navigate(ComposeRoute(initialNumber, initialBody))
         }
     }
 
     NavHost(
         navController = navController,
-        startDestination = "home",
+        startDestination = HomeRoute,
         modifier = Modifier.fillMaxSize(),
-        // Predictable push/pop transitions (full-width slide, matching the
-        // platform default look): a new page slides in from the right while
-        // the current one slides out to the left; back reverses both.
+        // Predictive-back friendly transitions: slideIntoContainer /
+        // slideOutOfContainer tie the animation progress to the system back
+        // gesture, so a swipe-back drags the page in sync with the finger.
         enterTransition = {
-            slideInHorizontally(animationSpec = tween(300)) { it } + fadeIn(animationSpec = tween(300))
+            slideIntoContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
         },
         exitTransition = {
-            slideOutHorizontally(animationSpec = tween(300)) { -it } + fadeOut(animationSpec = tween(300))
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
         },
         popEnterTransition = {
-            slideInHorizontally(animationSpec = tween(300)) { -it } + fadeIn(animationSpec = tween(300))
+            slideIntoContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
         },
         popExitTransition = {
-            slideOutHorizontally(animationSpec = tween(300)) { it } + fadeOut(animationSpec = tween(300))
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
         }
     ) {
-        composable("home") {
+        composable<HomeRoute> {
             HomeScreen(
                 vm = vm,
                 onOpenThread = { thread ->
                     navController.navigate(
-                        "thread/${thread.message.threadId}/" +
-                            Uri.encode(thread.message.address) + "/" + Uri.encode(thread.message.sender)
+                        ThreadRoute(thread.message.threadId, thread.message.address, thread.message.sender)
                     )
                 },
-                onOpenSettings = { navController.navigate("settings") },
-                onCompose = { number -> navController.navigate("compose?number=${Uri.encode(number)}&body=") }
+                onOpenSettings = { navController.navigate(SettingsRoute) },
+                onCompose = { number -> navController.navigate(ComposeRoute(number)) }
             )
         }
 
-        composable(
-            route = "thread/{threadId}/{address}/{sender}",
-            arguments = listOf(
-                navArgument("threadId") { type = NavType.LongType },
-                navArgument("address") { type = NavType.StringType },
-                navArgument("sender") { type = NavType.StringType }
-            )
-        ) { entry ->
-            val threadId = entry.arguments?.getLong("threadId") ?: 0L
-            val address = entry.arguments?.getString("address") ?: ""
-            val sender = entry.arguments?.getString("sender") ?: ""
-            LaunchedEffect(threadId) { vm.openThread(threadId) }
+        composable<ThreadRoute> { entry ->
+            val route = entry.toRoute<ThreadRoute>()
+            LaunchedEffect(route.threadId) { vm.openThread(route.threadId) }
             ThreadDetailScreen(
-                threadId = threadId,
-                address = address,
-                sender = sender,
+                threadId = route.threadId,
+                address = route.address,
+                sender = route.sender,
                 vm = vm,
                 onBack = { navController.popBackStack() }
             )
         }
 
-        composable("settings") {
+        composable<SettingsRoute> {
             val s by vm.state.collectAsStateWithLifecycle()
             SettingsScreen(
                 isDefaultSmsApp = s.isDefaultSmsApp,
@@ -195,16 +206,11 @@ fun MainScreen(
             )
         }
 
-        composable(
-            route = "compose?number={number}&body={body}",
-            arguments = listOf(
-                navArgument("number") { type = NavType.StringType; defaultValue = "" },
-                navArgument("body") { type = NavType.StringType; defaultValue = "" }
-            )
-        ) { entry ->
+        composable<ComposeRoute> { entry ->
+            val route = entry.toRoute<ComposeRoute>()
             ComposeMessageScreen(
-                initialNumber = entry.arguments?.getString("number") ?: "",
-                initialBody = entry.arguments?.getString("body") ?: "",
+                initialNumber = route.number,
+                initialBody = route.body,
                 onBack = { navController.popBackStack() }
             )
         }

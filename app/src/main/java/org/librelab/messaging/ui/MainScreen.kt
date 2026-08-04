@@ -34,6 +34,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -141,7 +142,11 @@ fun MainScreen(
     NavHost(
         navController = navController,
         startDestination = HomeRoute,
-        modifier = Modifier.fillMaxSize(),
+        // Opaque container: during a transition the sliding/fading pages
+        // would otherwise reveal the white window background underneath.
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         // Predictive-back friendly transitions: slideIntoContainer /
         // slideOutOfContainer tie the animation progress to the system back
         // gesture, so a swipe-back drags the page in sync with the finger.

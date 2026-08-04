@@ -201,7 +201,6 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     fun markSmsFailed(id: Long) = repository.markSmsFailed(id)
 
     fun loadContacts() {
-        if (_state.value.tab != 1) return
         viewModelScope.launch {
             val contacts = repository.loadContacts()
             _state.update { it.copy(contacts = contacts) }

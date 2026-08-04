@@ -38,10 +38,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -104,6 +109,7 @@ import com.composables.icons.materialsymbols.outlined.Error
 import com.composables.icons.materialsymbols.outlined.More_vert
 import com.composables.icons.materialsymbols.outlined.Send
 import org.librelab.messaging.SmsSentReceiver
+import org.librelab.messaging.data.ContactInfo
 import org.librelab.messaging.data.SendStatus
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsViewModel
@@ -139,6 +145,32 @@ fun ThreadDetailScreen(
     var input by remember { mutableStateOf("") }
     var pendingImage by remember { mutableStateOf<File?>(null) }
     var viewerUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    // New-thread mode: the FAB opens this screen with threadId=0. Instead of
+    // a conversation, show a recipient field (auto-focused, keyboard pops)
+    // plus a contact list filtered by the typed query (A-Z when empty).
+    val isNewThread = threadId == 0L
+    var newNumber by remember { mutableStateOf(if (isNewThread) address else "") }
+    val numberFocus = remember { FocusRequester() }
+    val collator = remember { java.text.Collator.getInstance(java.util.Locale.CHINA) }
+    val contacts = state.contacts
+    LaunchedEffect(Unit) {
+        if (isNewThread) {
+            vm.loadContacts()
+            numberFocus.requestFocus()
+        }
+    }
+    val filteredContacts = remember(newNumber, contacts) {
+        val q = newNumber.trim()
+        if (q.isEmpty()) {
+            contacts.sortedWith(compareBy(collator) { it.name })
+        } else {
+            contacts.filter { c -> (c.number?.contains(q) == true) || c.name.contains(q) }
+                .sortedWith(compareBy(collator) { it.name })
+        }
+    }
+    // Messages are sent to the chosen number in new-thread mode.
+    val targetAddress = if (isNewThread) newNumber else address
 
     // Multi-select (entered from the long-press menu 多选 item).
     var multiSelect by remember { mutableStateOf(false) }
@@ -206,17 +238,24 @@ fun ThreadDetailScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                    } else if (isNewThread) {
+                        Text(
+                            text = "新短信",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     } else {
+                        val titleText = if (isNewThread) newNumber else sender
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             InitialAvatar(
-                                initial = sender.firstOrNull()?.toString() ?: "?",
+                                initial = titleText.firstOrNull()?.toString() ?: "?",
                                 size = 36,
                                 container = MaterialTheme.colorScheme.primaryContainer,
                                 content = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                text = sender,
+                                text = titleText,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
@@ -289,7 +328,7 @@ fun ThreadDetailScreen(
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
-                    } else {
+                    } else if (!isNewThread) {
                         IconButton(
                             onClick = {
                                 context.startActivity(
@@ -322,6 +361,10 @@ fun ThreadDetailScreen(
                 onSend = {
                     val text = input.trim()
                                     if (text.isEmpty() && pendingImage == null) return@MessageInputBar
+                    if (targetAddress.isBlank()) {
+                        Toast.makeText(context, "请先输入收件人号码", Toast.LENGTH_SHORT).show()
+                        return@MessageInputBar
+                    }
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) !=
                         PackageManager.PERMISSION_GRANTED
                     ) {
@@ -346,7 +389,7 @@ fun ThreadDetailScreen(
                         )
                         val scope2 = scope
                         scope2.launch(Dispatchers.IO) {
-                            val sent = MmsSender.send(context, address, text, image, outboxId, sentIntent) != null
+                            val sent = MmsSender.send(context, targetAddress, text, image, outboxId, sentIntent) != null
                             withContext(Dispatchers.Main) {
                                 if (sent) {
                                     pendingImage = null
@@ -365,7 +408,7 @@ fun ThreadDetailScreen(
                     } else {
                         // SMS: insert our own outbox row (the system does not write
                         // one on this ROM), then flip its type via the sent callback.
-                        val recordId = vm.insertPendingSms(address, text)
+                        val recordId = vm.insertPendingSms(targetAddress, text)
                         val sentIntent = PendingIntent.getBroadcast(
                             context,
                             recordId.toInt(),
@@ -376,7 +419,7 @@ fun ThreadDetailScreen(
                             PendingIntent.FLAG_IMMUTABLE
                         )
                         ok = try {
-                            SmsManager.getDefault().sendTextMessage(address, null, text, sentIntent, null)
+                            SmsManager.getDefault().sendTextMessage(targetAddress, null, text, sentIntent, null)
                             true
                         } catch (e: Exception) {
                             vm.markSmsFailed(recordId)
@@ -395,11 +438,76 @@ fun ThreadDetailScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            state = listState,
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+        ) {
+            if (isNewThread) {
+                // New thread: recipient field (auto-focused) + contact
+                // picker live at the top of the chat view; the conversation
+                // area and input bar stay visible below.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newNumber,
+                        onValueChange = { newNumber = it },
+                        label = { Text("输入号码或选择联系人") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(numberFocus)
+                    )
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                    ) {
+                        if (filteredContacts.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "无匹配联系人",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                        } else {
+                            items(filteredContacts, key = { (it.number ?: "") + it.name }) { contact ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { contact.number?.let { newNumber = it } }
+                                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = contact.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    contact.number?.let {
+                                        Text(
+                                            text = it,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
             // Newest message hugs the input bar: reversed data +
             // reverseLayout (index 0 = newest, rendered at the bottom).
             reverseLayout = true,
@@ -433,6 +541,7 @@ fun ThreadDetailScreen(
                         vm.refresh()
                     }
                 )
+            }
             }
         }
     }

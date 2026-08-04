@@ -184,7 +184,11 @@ fun MainScreen(
                     )
                 },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
-                onCompose = { number -> navController.navigate(ComposeRoute(number)) }
+                onCompose = { number ->
+                    // FAB: start a new conversation inside the existing detail
+                    // screen (threadId=0 → contact picker at the top).
+                    navController.navigate(ThreadRoute(0L, number, ""))
+                }
             )
         }
 

@@ -452,6 +452,10 @@ private fun SwipeableThreadRow(
             }
         }
     )
+    // Reset any stale dismissed state when this row (re)appears — after being
+    // archived and shown again the state would otherwise stay "swiped out",
+    // leaving the 取消归档 background visible and the row un-swipeable.
+    LaunchedEffect(thread.message.threadId) { dismissState.reset() }
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = false,

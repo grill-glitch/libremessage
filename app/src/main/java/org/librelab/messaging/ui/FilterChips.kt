@@ -50,7 +50,7 @@ fun FilterChipRow(
                         modifier = Modifier.size(FilterChipDefaults.IconSize)
                     )
                 },
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(10.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -446,8 +446,9 @@ private fun HomeScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onCompose("") },
-                shape = RoundedCornerShape(20.dp),
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+                shape = RoundedCornerShape(18.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(64.dp)
             ) {
                 Icon(
                     imageVector = MaterialSymbols.Outlined.Edit,

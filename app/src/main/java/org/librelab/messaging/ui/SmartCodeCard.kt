@@ -154,17 +154,22 @@ fun SmartCodeCard(
                 }
             }
 
-            // Footer row: body, absolute send time, open-original button.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = message?.body ?: "暂无验证码短信",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(12.dp))
+            // Body row
+            Text(
+                text = message?.body ?: "暂无验证码短信",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Send time + open-original, parked at the card's bottom edge.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 TextButton(
                     onClick = { message?.let(onOpenOriginal) },
                     enabled = message != null,
@@ -266,7 +271,9 @@ private fun CodeCardRow(
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
                 ) {
                     Text(
                         text = formatSendTime(codeMsg.date),

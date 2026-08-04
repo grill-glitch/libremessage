@@ -10,8 +10,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -144,14 +142,9 @@ fun ThreadDetailScreen(
     }
 
     // IME lift: the message list and the input bar move together, translated
-    // by the animated keyboard height — synchronous movement, no resize.
+    // by the keyboard height — instantaneous, no animation.
     val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val imeOffset by animateIntAsState(
-        targetValue = imeBottom,
-        animationSpec = tween(durationMillis = 120),
-        label = "imeLift"
-    )
+    val imeOffset = WindowInsets.ime.getBottom(density)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),

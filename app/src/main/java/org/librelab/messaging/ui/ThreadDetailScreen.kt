@@ -2,15 +2,23 @@ package org.librelab.messaging.ui
 
 import android.Manifest
 import android.app.PendingIntent
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.telephony.SmsManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,11 +61,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -104,6 +117,7 @@ fun ThreadDetailScreen(
     val context = LocalContext.current
     var input by remember { mutableStateOf("") }
     var pendingImage by remember { mutableStateOf<File?>(null) }
+    var viewerUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -289,10 +303,69 @@ fun ThreadDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(messages.asReversed(), key = { it.id }) { message ->
-                MessageBubble(message = message, myInitial = "我")
+                MessageBubble(
+                    message = message,
+                    myInitial = "我",
+                    onOpenImage = { viewerUri = it },
+                    onSaveImage = { uri ->
+                        val saved = saveImageToGallery(context, uri)
+                        Toast.makeText(
+                            context,
+                            if (saved) "已保存到相册" else "保存失败",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
             }
         }
     }
+
+    // Full-screen image viewer: tap anywhere to dismiss.
+    viewerUri?.let { uri ->
+        Dialog(onDismissRequest = { viewerUri = null }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.92f))
+                    .clickable { viewerUri = null }
+            ) {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = "图片",
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Copy an MMS part into the gallery (Pictures/Librelab). */
+private fun saveImageToGallery(context: Context, uri: android.net.Uri): Boolean = try {
+    val resolver = context.contentResolver
+    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return false
+    val name = "MMS_${System.currentTimeMillis()}.jpg"
+    val values = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, name)
+        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        if (Build.VERSION.SDK_INT >= 29) {
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Librelab")
+        } else {
+            put(
+                MediaStore.Images.Media.DATA,
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                    .absolutePath + "/Librelab/$name"
+            )
+        }
+    }
+    val outUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+    val out = resolver.openOutputStream(outUri) ?: return false
+    out.use { it.write(bytes) }
+    true
+} catch (e: Exception) {
+    false
 }
 
 /** 32dp round initial avatar next to a bubble (36dp variant used in the top bar). */
@@ -319,7 +392,12 @@ private fun InitialAvatar(
 }
 
 @Composable
-private fun MessageBubble(message: SmsMessage, myInitial: String) {
+private fun MessageBubble(
+    message: SmsMessage,
+    myInitial: String,
+    onOpenImage: (android.net.Uri) -> Unit,
+    onSaveImage: (android.net.Uri) -> Unit
+) {
     val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.date))
     val hasImages = message.imageUris.isNotEmpty()
     if (message.isSent) {
@@ -331,7 +409,7 @@ private fun MessageBubble(message: SmsMessage, myInitial: String) {
         ) {
             Column(horizontalAlignment = Alignment.End) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri)
+                    MmsImage(uri, onOpenImage, onSaveImage)
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -378,7 +456,7 @@ private fun MessageBubble(message: SmsMessage, myInitial: String) {
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.Start) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri)
+                    MmsImage(uri, onOpenImage, onSaveImage)
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -405,9 +483,15 @@ private fun MessageBubble(message: SmsMessage, myInitial: String) {
     }
 }
 
-/** MMS image, rendered outside the bubble with a soft corner radius. */
+/** MMS image, rendered outside the bubble with a soft corner radius.
+ * Tap to view full-screen; long-press to save to the gallery. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MmsImage(uri: android.net.Uri) {
+private fun MmsImage(
+    uri: android.net.Uri,
+    onOpenImage: (android.net.Uri) -> Unit,
+    onSaveImage: (android.net.Uri) -> Unit
+) {
     AsyncImage(
         model = uri,
         contentDescription = "图片消息",
@@ -415,9 +499,14 @@ private fun MmsImage(uri: android.net.Uri) {
             .padding(bottom = 6.dp)
             .clip(RoundedCornerShape(8.dp))
             .sizeIn(maxWidth = 220.dp, maxHeight = 280.dp)
+            .combinedClickable(
+                onClick = { onOpenImage(uri) },
+                onLongClick = { onSaveImage(uri) }
+            )
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BubbleContent(
     message: SmsMessage,
@@ -427,7 +516,21 @@ private fun BubbleContent(
     container: androidx.compose.ui.graphics.Color,
     content: androidx.compose.ui.graphics.Color
 ) {
-    Surface(shape = shape, color = container) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Surface(
+        shape = shape,
+        color = container,
+        modifier = Modifier.combinedClickable(
+            onClick = {},
+            onLongClick = {
+                if (message.body.isNotBlank()) {
+                    clipboard.setText(AnnotatedString(message.body))
+                    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(
                 text = message.body,

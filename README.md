@@ -42,6 +42,21 @@ Compose. A clean, modern SMS client with no Google proprietary code.
 
 APK output: `app/build/outputs/apk/release/app-release.apk`
 
+## Credits
+
+Matching rules in `SmsParser` draw on two open-source projects:
+
+- [otphelper](https://github.com/jd1378/otphelper) — multilingual
+  verification-code keyword tables (code/OTP/验证码/コード/인증번호/код …)
+  and digit-normalization tricks (Arabic-Indic, Persian, full-width)
+- [deliveries](https://github.com/itsvic-dev/deliveries) — per-carrier
+  tracking-number formats (EMS, DHL, UPS, 4PX, InPost, 顺丰 …) used to
+  recognize parcel messages
+
+The MMS PDU encoder under `mms/pdu/` is the AOSP
+`com.google.android.mms.pdu` library (Apache-2.0, © The Android Open
+Source Project), copied verbatim with the original license headers.
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).

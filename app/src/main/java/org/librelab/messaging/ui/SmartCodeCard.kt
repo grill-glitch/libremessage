@@ -258,7 +258,7 @@ internal fun CodeCardRow(
             Column(
                 Modifier
                     .weight(1f)
-                    .heightIn(min = 96.dp)
+                    .heightIn(min = 128.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -281,11 +281,14 @@ internal fun CodeCardRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 // Elastic spacer pushes the time + 原始短信 row to the
-                // bottom edge of the card.
+                // bottom-right corner of the card.
                 Spacer(Modifier.weight(1f))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.End),
+                    horizontalArrangement = Arrangement.End
                 ) {
                     Text(
                         text = formatSendTime(codeMsg.date),

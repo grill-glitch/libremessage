@@ -30,9 +30,11 @@ import androidx.navigation.toRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -148,32 +150,34 @@ fun MainScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
-        // Predictive-back friendly transitions: slideIntoContainer /
-        // slideOutOfContainer tie the animation progress to the system back
-        // gesture, so a swipe-back drags the page in sync with the finger.
+        // Standard Material 3 transitions (the same feel as system settings):
+        // forward = shared-axis slide left + fade, back = previous page
+        // scales up from 90% while the current page slides right and fades.
+        // Predictive-back friendly: slideIntoContainer / slideOutOfContainer
+        // tie the animation progress to the system back gesture.
         enterTransition = {
             slideIntoContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300)
-            ) + fadeIn(animationSpec = tween(300))
+                animationSpec = tween(300, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
         },
         exitTransition = {
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300)
-            ) + fadeOut(animationSpec = tween(300))
+                animationSpec = tween(300, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
         },
         popEnterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            ) + fadeIn(animationSpec = tween(300))
+            scaleIn(
+                initialScale = 0.9f,
+                animationSpec = tween(300, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
         },
         popExitTransition = {
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            ) + fadeOut(animationSpec = tween(300))
+                animationSpec = tween(300, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
         }
     ) {
         composable<HomeRoute> {

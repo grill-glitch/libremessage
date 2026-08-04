@@ -14,6 +14,7 @@ import com.composables.icons.materialsymbols.outlined.Search
 import com.composables.icons.materialsymbols.outlined.Settings
 
 import android.Manifest
+import android.net.Uri
 import android.app.role.RoleManager
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -25,9 +26,11 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.AnimatedVisibility
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -114,16 +117,134 @@ fun MainScreen(
     initialNumber: String = "",
     initialBody: String = ""
 ) {
+    val navController = rememberNavController()
+
+    // Deep-link: launch straight into the compose screen when the activity
+    // was started with a number/body (e.g. share intent).
+    LaunchedEffect(Unit) {
+        if (initialNumber.isNotBlank() || initialBody.isNotBlank()) {
+            navController.navigate(
+                "compose?number=${Uri.encode(initialNumber)}&body=${Uri.encode(initialBody)}"
+            )
+        }
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = "home",
+        modifier = Modifier.fillMaxSize(),
+        // Predictable push/pop transitions: a new page slides in from the
+        // right; back pops it out to the right.
+        enterTransition = {
+            slideInHorizontally(animationSpec = tween(300)) { it } + fadeIn(animationSpec = tween(300))
+        },
+        exitTransition = {
+            slideOutHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeOut(animationSpec = tween(300))
+        },
+        popEnterTransition = {
+            slideInHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeIn(animationSpec = tween(300))
+        },
+        popExitTransition = {
+            slideOutHorizontally(animationSpec = tween(300)) { it } + fadeOut(animationSpec = tween(300))
+        }
+    ) {
+        composable("home") {
+            HomeScreen(
+                vm = vm,
+                onOpenThread = { thread ->
+                    navController.navigate(
+                        "thread/${thread.message.threadId}/" +
+                            Uri.encode(thread.message.address) + "/" + Uri.encode(thread.message.sender)
+                    )
+                },
+                onOpenSettings = { navController.navigate("settings") },
+                onCompose = { number -> navController.navigate("compose?number=${Uri.encode(number)}&body=") }
+            )
+        }
+
+        composable(
+            route = "thread/{threadId}/{address}/{sender}",
+            arguments = listOf(
+                navArgument("threadId") { type = NavType.LongType },
+                navArgument("address") { type = NavType.StringType },
+                navArgument("sender") { type = NavType.StringType }
+            )
+        ) { entry ->
+            val threadId = entry.arguments?.getLong("threadId") ?: 0L
+            val address = entry.arguments?.getString("address") ?: ""
+            val sender = entry.arguments?.getString("sender") ?: ""
+            LaunchedEffect(threadId) { vm.openThread(threadId) }
+            ThreadDetailScreen(
+                threadId = threadId,
+                address = address,
+                sender = sender,
+                vm = vm,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("settings") {
+            val s by vm.state.collectAsStateWithLifecycle()
+            SettingsScreen(
+                isDefaultSmsApp = s.isDefaultSmsApp,
+                showAdsInAll = s.showAdsInAll,
+                onSetDefaultApp = rememberSetDefaultApp(vm),
+                onToggleAdsInAll = { vm.setShowAdsInAll(it) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "compose?number={number}&body={body}",
+            arguments = listOf(
+                navArgument("number") { type = NavType.StringType; defaultValue = "" },
+                navArgument("body") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { entry ->
+            ComposeMessageScreen(
+                initialNumber = entry.arguments?.getString("number") ?: "",
+                initialBody = entry.arguments?.getString("body") ?: "",
+                onBack = { navController.popBackStack() }
+            )
+        }
+    }
+}
+
+/**
+ * Default-SMS-app picker: Role request on Android 10+, legacy
+ * ACTION_CHANGE_DEFAULT intent below.
+ */
+@Composable
+private fun rememberSetDefaultApp(vm: SmsViewModel): () -> Unit {
+    val context = LocalContext.current
+    val defaultLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { vm.refresh() }
+    return {
+        val intent = defaultSmsRequestIntent(context)
+        if (intent == null) {
+            Toast.makeText(context, R.string.default_app_unavailable, Toast.LENGTH_LONG).show()
+        } else {
+            try {
+                defaultLauncher.launch(intent)
+            } catch (e: Exception) {
+                Toast.makeText(context, R.string.default_app_unavailable, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+}
+
+/** Home tab: conversation list, chips, banner, multi-select, FAB. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeScreen(
+    vm: SmsViewModel,
+    onOpenThread: (SmsThreadItem) -> Unit,
+    onOpenSettings: () -> Unit,
+    onCompose: (String) -> Unit
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var composeTarget by remember {
-        mutableStateOf(
-            if (initialNumber.isNotBlank() || initialBody.isNotBlank()) {
-                ComposeTarget(initialNumber, initialBody)
-            } else null
-        )
-    }
-    var selectedThread by remember { mutableStateOf<SmsThreadItem?>(null) }
     val searchFocus = remember { FocusRequester() }
 
     // Multi-select mode (long-press a conversation row to enter).
@@ -156,25 +277,7 @@ fun MainScreen(
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { vm.refresh() }
-    val defaultLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { vm.refresh() }
-
-    // Open the system default-SMS-app picker. On Android 10+ this is a Role
-    // request (ACTION_CHANGE_DEFAULT is no longer handled by AOSP MaterialSymbols.Outlined.Settings);
-    // below that fall back to the legacy intent.
-    val onSetDefaultApp: () -> Unit = {
-        val intent = defaultSmsRequestIntent(context)
-        if (intent == null) {
-            Toast.makeText(context, R.string.default_app_unavailable, Toast.LENGTH_LONG).show()
-        } else {
-            try {
-                defaultLauncher.launch(intent)
-            } catch (e: Exception) {
-                Toast.makeText(context, R.string.default_app_unavailable, Toast.LENGTH_LONG).show()
-            }
-        }
-    }
+    val onSetDefaultApp = rememberSetDefaultApp(vm)
 
     // First-run auto-request for the missing runtime permissions.
     LaunchedEffect(Unit) {
@@ -183,16 +286,6 @@ fun MainScreen(
                 android.content.pm.PackageManager.PERMISSION_GRANTED
         }
         if (missing.isNotEmpty()) permLauncher.launch(missing.toTypedArray())
-    }
-
-    if (composeTarget != null) {
-        val target = composeTarget!!
-        ComposeMessageScreen(
-            initialNumber = target.number,
-            initialBody = target.body,
-            onBack = { composeTarget = null }
-        )
-        return
     }
 
     // Batch-delete confirmation.
@@ -301,32 +394,32 @@ fun MainScreen(
                         }
                     } else {
                         IconButton(
-                        onClick = {
-                            if (state.searchActive) {
-                                vm.setSearchQuery("")
-                                vm.setSearchActive(false)
-                            } else {
-                                vm.setSearchActive(true)
-                            }
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (state.searchActive) MaterialSymbols.Outlined.Close else MaterialSymbols.Outlined.Search,
-                            contentDescription = if (state.searchActive) "关闭搜索" else "搜索",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                    IconButton(
-                        onClick = { vm.setShowSettings(true) },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = MaterialSymbols.Outlined.Settings,
-                            contentDescription = "设置",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
+                            onClick = {
+                                if (state.searchActive) {
+                                    vm.setSearchQuery("")
+                                    vm.setSearchActive(false)
+                                } else {
+                                    vm.setSearchActive(true)
+                                }
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (state.searchActive) MaterialSymbols.Outlined.Close else MaterialSymbols.Outlined.Search,
+                                contentDescription = if (state.searchActive) "关闭搜索" else "搜索",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        IconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Settings,
+                                contentDescription = "设置",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -336,7 +429,7 @@ fun MainScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { composeTarget = ComposeTarget("", "") },
+                onClick = { onCompose("") },
                 shape = RoundedCornerShape(20.dp),
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             ) {
@@ -373,7 +466,7 @@ fun MainScreen(
                 onFilter = vm::setFilter,
                 onCopyCode = { code -> copyCode(context, code) },
                 onOpenOriginal = { msg ->
-                    selectedThread = SmsThreadItem(msg, 0, 1)
+                    onOpenThread(SmsThreadItem(msg, 0, 1))
                 },
                 selectionMode = selectionMode,
                 selectedIds = selectedIds,
@@ -389,74 +482,17 @@ fun MainScreen(
                     permLauncher.launch(REQUIRED_PERMISSIONS)
                 },
                 onSetDefaultApp = onSetDefaultApp,
-                onOpenThread = { selectedThread = it },
+                onOpenThread = onOpenThread,
                 modifier = Modifier
                     .padding(innerPadding)
                     .fillMaxSize()
             )
             1 -> ContactsScreen(
                 contacts = state.contacts,
-                onContactClick = { number -> composeTarget = ComposeTarget(number, "") },
+                onContactClick = { number -> onCompose(number) },
                 modifier = Modifier
                     .padding(innerPadding)
                     .fillMaxSize()
-            )
-        }
-    }
-
-    // Settings as an overlay page: slides in from the right and, on back,
-    // slides back out — a predictable push/pop transition.
-    // System back also closes it (with the slide-out animation).
-    if (state.showSettings) {
-        BackHandler { vm.setShowSettings(false) }
-    }
-    AnimatedVisibility(
-        visible = state.showSettings,
-        enter = slideInHorizontally(animationSpec = tween(300)) { it } +
-            fadeIn(animationSpec = tween(300)),
-        exit = slideOutHorizontally(animationSpec = tween(300)) { it } +
-            fadeOut(animationSpec = tween(300))
-    ) {
-        SettingsScreen(
-            isDefaultSmsApp = state.isDefaultSmsApp,
-            showAdsInAll = state.showAdsInAll,
-            onSetDefaultApp = onSetDefaultApp,
-            onToggleAdsInAll = { vm.setShowAdsInAll(it) },
-            onBack = { vm.setShowSettings(false) }
-        )
-    }
-
-    // Conversation detail: same push/pop transition as settings. Opened by
-    // tapping a row (selectedThread set), closed by back (nulls it).
-    // AnimatedContent keeps the old page composed while the exit animation
-    // plays (AnimatedVisibility would drop the content instantly).
-    val thread = selectedThread
-    if (thread != null) {
-        LaunchedEffect(thread.message.threadId) { vm.openThread(thread.message.threadId) }
-    }
-    AnimatedContent(
-        targetState = thread,
-        modifier = Modifier.fillMaxSize(),
-        transitionSpec = {
-            if (targetState != null) {
-                (slideInHorizontally(animationSpec = tween(300)) { it } + fadeIn(animationSpec = tween(300))) togetherWith
-                    (slideOutHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeOut(animationSpec = tween(300)))
-            } else {
-                (slideInHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeIn(animationSpec = tween(300))) togetherWith
-                    (slideOutHorizontally(animationSpec = tween(300)) { it } + fadeOut(animationSpec = tween(300)))
-            }
-        }
-    ) { t ->
-        if (t != null) {
-            ThreadDetailScreen(
-                threadId = t.message.threadId,
-                address = t.message.address,
-                sender = t.message.sender,
-                vm = vm,
-                onBack = {
-                    vm.closeThread()
-                    selectedThread = null
-                }
             )
         }
     }

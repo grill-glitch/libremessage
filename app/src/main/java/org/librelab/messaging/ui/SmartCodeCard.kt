@@ -8,6 +8,9 @@ import com.composables.icons.materialsymbols.outlined.Safety_check
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -236,7 +239,10 @@ internal fun CodeCardRow(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -250,7 +256,7 @@ internal fun CodeCardRow(
                 modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).fillMaxHeight()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = codeMsg.merchantName,
@@ -271,11 +277,12 @@ internal fun CodeCardRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                // Elastic spacer pushes the time + 原始短信 row to the
+                // bottom edge of the card.
+                Spacer(Modifier.weight(1f))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = formatSendTime(codeMsg.date),

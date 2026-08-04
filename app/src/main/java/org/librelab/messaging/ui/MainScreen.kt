@@ -183,23 +183,6 @@ fun MainScreen(
         if (missing.isNotEmpty()) permLauncher.launch(missing.toTypedArray())
     }
 
-    // Conversation detail takes over the whole screen when a row is tapped.
-    val thread = selectedThread
-    if (thread != null) {
-        LaunchedEffect(thread.message.threadId) { vm.openThread(thread.message.threadId) }
-        ThreadDetailScreen(
-            threadId = thread.message.threadId,
-            address = thread.message.address,
-            sender = thread.message.sender,
-            vm = vm,
-            onBack = {
-                vm.closeThread()
-                selectedThread = null
-            }
-        )
-        return
-    }
-
     if (composeTarget != null) {
         val target = composeTarget!!
         ComposeMessageScreen(
@@ -439,6 +422,33 @@ fun MainScreen(
             onToggleAdsInAll = { vm.setShowAdsInAll(it) },
             onBack = { vm.setShowSettings(false) }
         )
+    }
+
+    // Conversation detail: same push/pop transition as settings. Opened by
+    // tapping a row (selectedThread set), closed by back (nulls it).
+    val thread = selectedThread
+    if (thread != null) {
+        LaunchedEffect(thread.message.threadId) { vm.openThread(thread.message.threadId) }
+    }
+    AnimatedVisibility(
+        visible = thread != null,
+        enter = slideInHorizontally(animationSpec = tween(300)) { it } +
+            fadeIn(animationSpec = tween(300)),
+        exit = slideOutHorizontally(animationSpec = tween(300)) { it } +
+            fadeOut(animationSpec = tween(300))
+    ) {
+        thread?.let { t ->
+            ThreadDetailScreen(
+                threadId = t.message.threadId,
+                address = t.message.address,
+                sender = t.message.sender,
+                vm = vm,
+                onBack = {
+                    vm.closeThread()
+                    selectedThread = null
+                }
+            )
+        }
     }
 }
 

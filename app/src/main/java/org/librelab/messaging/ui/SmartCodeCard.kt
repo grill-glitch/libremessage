@@ -225,7 +225,7 @@ fun SmartCodeCard(
 }
 
 @Composable
-private fun CodeCardRow(
+internal fun CodeCardRow(
     codeMsg: SmsMessage,
     onCopy: (String) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit

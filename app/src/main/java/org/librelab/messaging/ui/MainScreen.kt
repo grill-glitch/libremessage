@@ -24,7 +24,6 @@ import android.provider.Telephony
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,9 +47,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -395,7 +391,6 @@ fun MainScreen(
                 onOpenOriginal = { msg ->
                     selectedThread = SmsThreadItem(msg, 0, 1)
                 },
-                onArchive = { threadId, archive -> vm.archiveThread(threadId, archive) },
                 selectionMode = selectionMode,
                 selectedIds = selectedIds,
                 onToggleSelect = { t ->
@@ -435,7 +430,6 @@ private fun SmsListContent(
     onSetDefaultApp: () -> Unit,
     onOpenThread: (SmsThreadItem) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit,
-    onArchive: (Long, Boolean) -> Unit,
     selectionMode: Boolean = false,
     selectedIds: Set<Long> = emptySet(),
     onToggleSelect: (SmsThreadItem) -> Unit = {},
@@ -511,24 +505,14 @@ private fun SmsListContent(
                 item { EmptyBox("暂无短信") }
             } else {
                 items(threads, key = { it.message.threadId }) { thread ->
-                    if (selectionMode) {
-                        MessageItem(
-                            thread = thread,
-                            onClick = { onToggleSelect(thread) },
-                            onLongClick = {},
-                            selected = thread.message.threadId in selectedIds
-                        )
-                    } else {
-                        SwipeableThreadRow(
-                            thread = thread,
-                            isArchivedView = state.filter == SmsFilter.ARCHIVED,
-                            onClick = { onOpenThread(thread) },
-                            onLongPress = { onLongPress(thread) },
-                            onArchive = {
-                                onArchive(thread.message.threadId, state.filter != SmsFilter.ARCHIVED)
-                            }
-                        )
-                    }
+                    MessageItem(
+                        thread = thread,
+                        onClick = {
+                            if (selectionMode) onToggleSelect(thread) else onOpenThread(thread)
+                        },
+                        onLongClick = { onLongPress(thread) },
+                        selected = thread.message.threadId in selectedIds
+                    )
                 }
             }
         }
@@ -546,54 +530,6 @@ private fun EmptyBox(text: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-/** A conversation row wrapped in a swipe-to-archive gesture (left swipe). */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SwipeableThreadRow(
-    thread: SmsThreadItem,
-    isArchivedView: Boolean,
-    onClick: () -> Unit,
-    onLongPress: () -> Unit = {},
-    onArchive: () -> Unit
-) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                onArchive()
-                true
-            } else {
-                false
-            }
-        }
-    )
-    // Reset any stale dismissed state when this row (re)appears — after being
-    // archived and shown again the state would otherwise stay "swiped out",
-    // leaving the 取消归档 background visible and the row un-swipeable.
-    LaunchedEffect(thread.message.threadId) { dismissState.reset() }
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Text(
-                    text = if (isArchivedView) "取消归档" else "归档",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(end = 24.dp)
-                )
-            }
-        }
-    ) {
-        MessageItem(thread = thread, onClick = onClick, onLongClick = onLongPress)
     }
 }
 

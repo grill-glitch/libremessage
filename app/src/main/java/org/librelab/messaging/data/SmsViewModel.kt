@@ -33,13 +33,29 @@ data class UiState(
 ) {
     /** Latest code message pinned to the top smart card. */
     val latestCode: SmsMessage?
-        get() = messages.asSequence()
-            .filter { it.category == MessageCategory.CODE }
-            .maxByOrNull { it.date }
+        get() = codeMessages.maxByOrNull { it.date }
 
-    /** All code/express messages in descending order (for the expanded card list). */
+    /** Latest express pickup message pinned to the pickup smart card. */
+    val latestPickup: SmsMessage?
+        get() = pickupMessages.maxByOrNull { it.date }
+
+    /** Verification-code messages (smart card expanded list). */
     val allCodes: List<SmsMessage>
-        get() = messages.filter { it.category == MessageCategory.CODE }.sortedByDescending { it.date }
+        get() = codeMessages.sortedByDescending { it.date }
+
+    /** Express pickup-code messages (pickup card expanded list). */
+    val allPickups: List<SmsMessage>
+        get() = pickupMessages.sortedByDescending { it.date }
+
+    private val codeMessages: List<SmsMessage>
+        get() = messages.filter {
+            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "验证码"
+        }
+
+    private val pickupMessages: List<SmsMessage>
+        get() = messages.filter {
+            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "取件码"
+        }
 
     /** Messages after applying filter chip + search query. */
     val visibleMessages: List<SmsMessage>

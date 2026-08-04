@@ -343,6 +343,15 @@ private fun SmsListContent(
                 onCopy = onCopyCode
             )
         }
+        item {
+            SmartCodeCard(
+                message = state.latestPickup,
+                allCodes = state.allPickups,
+                onCopy = onCopyCode,
+                fallbackLabel = "取件码",
+                emptyText = "暂无取件码短信"
+            )
+        }
         item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
 
         val threads = state.visibleThreads

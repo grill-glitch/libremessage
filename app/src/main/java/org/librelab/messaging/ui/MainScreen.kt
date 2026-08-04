@@ -25,6 +25,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -426,18 +428,26 @@ fun MainScreen(
 
     // Conversation detail: same push/pop transition as settings. Opened by
     // tapping a row (selectedThread set), closed by back (nulls it).
+    // AnimatedContent keeps the old page composed while the exit animation
+    // plays (AnimatedVisibility would drop the content instantly).
     val thread = selectedThread
     if (thread != null) {
         LaunchedEffect(thread.message.threadId) { vm.openThread(thread.message.threadId) }
     }
-    AnimatedVisibility(
-        visible = thread != null,
-        enter = slideInHorizontally(animationSpec = tween(300)) { it } +
-            fadeIn(animationSpec = tween(300)),
-        exit = slideOutHorizontally(animationSpec = tween(300)) { it } +
-            fadeOut(animationSpec = tween(300))
-    ) {
-        thread?.let { t ->
+    AnimatedContent(
+        targetState = thread,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            if (targetState != null) {
+                (slideInHorizontally(animationSpec = tween(300)) { it } + fadeIn(animationSpec = tween(300))) togetherWith
+                    (slideOutHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeOut(animationSpec = tween(300)))
+            } else {
+                (slideInHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeIn(animationSpec = tween(300))) togetherWith
+                    (slideOutHorizontally(animationSpec = tween(300)) { it } + fadeOut(animationSpec = tween(300)))
+            }
+        }
+    ) { t ->
+        if (t != null) {
             ThreadDetailScreen(
                 threadId = t.message.threadId,
                 address = t.message.address,

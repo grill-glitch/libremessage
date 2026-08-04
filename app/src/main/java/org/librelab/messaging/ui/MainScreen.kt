@@ -158,26 +158,26 @@ fun MainScreen(
         enterTransition = {
             slideIntoContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
+                animationSpec = tween(200, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing))
         },
         exitTransition = {
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
+                animationSpec = tween(200, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(120, easing = FastOutSlowInEasing))
         },
         popEnterTransition = {
             scaleIn(
                 initialScale = 0.9f,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
+                animationSpec = tween(200, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing))
         },
         popExitTransition = {
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
+                animationSpec = tween(200, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
         }
     ) {
         composable<HomeRoute> {

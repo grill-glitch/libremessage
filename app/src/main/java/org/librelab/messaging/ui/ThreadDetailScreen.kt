@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -94,6 +95,11 @@ import com.composables.icons.materialsymbols.outlined.Attach_file
 import com.composables.icons.materialsymbols.outlined.Call
 import com.composables.icons.materialsymbols.outlined.Check
 import com.composables.icons.materialsymbols.outlined.Close
+import com.composables.icons.materialsymbols.outlined.Content_copy
+import com.composables.icons.materialsymbols.outlined.Delete
+import com.composables.icons.materialsymbols.outlined.Deselect
+import com.composables.icons.materialsymbols.outlined.Select_all
+import com.composables.icons.materialsymbols.outlined.Share
 import com.composables.icons.materialsymbols.outlined.Done_all
 import com.composables.icons.materialsymbols.outlined.Error
 import com.composables.icons.materialsymbols.outlined.More_vert
@@ -130,9 +136,23 @@ fun ThreadDetailScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     var input by remember { mutableStateOf("") }
     var pendingImage by remember { mutableStateOf<File?>(null) }
     var viewerUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    // Multi-select (entered from the long-press menu 多选 item).
+    var multiSelect by remember { mutableStateOf(false) }
+    var selectedKeys by remember { mutableStateOf(setOf<String>()) }
+    var confirmBatchDelete by remember { mutableStateOf(false) }
+    val selectedMessages = messages.filter { it.key in selectedKeys }
+    val allMessageKeys = messages.map { it.key }
+    val allSelected = allMessageKeys.isNotEmpty() && selectedKeys.containsAll(allMessageKeys)
+    fun exitMultiSelect() {
+        multiSelect = false
+        selectedKeys = emptySet()
+        confirmBatchDelete = false
+    }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -179,42 +199,110 @@ fun ThreadDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        InitialAvatar(
-                            initial = sender.firstOrNull()?.toString() ?: "?",
-                            size = 36,
-                            container = MaterialTheme.colorScheme.primaryContainer,
-                            content = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(Modifier.width(10.dp))
+                    if (multiSelect) {
                         Text(
-                            text = sender,
+                            text = "已选 ${selectedKeys.size} 项",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            color = MaterialTheme.colorScheme.onSurface
                         )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            InitialAvatar(
+                                initial = sender.firstOrNull()?.toString() ?: "?",
+                                size = 36,
+                                container = MaterialTheme.colorScheme.primaryContainer,
+                                content = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = sender,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(MaterialSymbols.Outlined.Arrow_back, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
+                    IconButton(
+                        onClick = {
+                            if (multiSelect) exitMultiSelect() else onBack()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (multiSelect) MaterialSymbols.Outlined.Close else MaterialSymbols.Outlined.Arrow_back,
+                            contentDescription = if (multiSelect) "取消选择" else "返回",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            context.startActivity(
-                                Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(address)}"))
+                    if (multiSelect) {
+                        IconButton(
+                            onClick = {
+                                selectedKeys = if (allSelected) emptySet() else allMessageKeys.toSet()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (allSelected) MaterialSymbols.Outlined.Deselect else MaterialSymbols.Outlined.Select_all,
+                                contentDescription = "全选",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    ) {
-                        Icon(MaterialSymbols.Outlined.Call, contentDescription = "拨号", tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                    IconButton(onClick = {
+                        IconButton(
+                            onClick = {
+                                val text = selectedMessages.joinToString("\n") { it.body }
+                                if (text.isNotBlank()) {
+                                    clipboard.setText(AnnotatedString(text))
+                                    Toast.makeText(context, "已复制 ${selectedMessages.size} 条", Toast.LENGTH_SHORT).show()
+                                }
+                                exitMultiSelect()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Content_copy,
+                                contentDescription = "复制",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                val text = selectedMessages.joinToString("\n") { it.body }
+                                if (text.isNotBlank()) shareText(context, text)
+                                exitMultiSelect()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Share,
+                                contentDescription = "分享",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(
+                            onClick = { confirmBatchDelete = true }
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Delete,
+                                contentDescription = "删除",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(address)}"))
+                                )
+                            }
+                        ) {
+                            Icon(MaterialSymbols.Outlined.Call, contentDescription = "拨号", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                        IconButton(onClick = {
                         Toast.makeText(context, "更多功能开发中", Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(MaterialSymbols.Outlined.More_vert, contentDescription = "更多", tint = MaterialTheme.colorScheme.onSurface)
+                    }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -317,10 +405,19 @@ fun ThreadDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(messages.asReversed(), key = { it.id }) { message ->
+            items(messages.asReversed(), key = { it.key }) { message ->
                 MessageBubble(
                     message = message,
                     myInitial = "我",
+                    multiSelect = multiSelect,
+                    selected = message.key in selectedKeys,
+                    onToggleSelect = { key ->
+                        selectedKeys = if (key in selectedKeys) selectedKeys - key else selectedKeys + key
+                    },
+                    onStartMultiSelect = { msg ->
+                        multiSelect = true
+                        selectedKeys = setOf(msg.key)
+                    },
                     onOpenImage = { viewerUri = it },
                     onSaveImage = { uri ->
                         val saved = saveImageToGallery(context, uri)
@@ -337,6 +434,27 @@ fun ThreadDetailScreen(
                 )
             }
         }
+    }
+
+    // Batch-delete confirmation (multi-select mode).
+    if (confirmBatchDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmBatchDelete = false },
+            title = { Text("删除消息") },
+            text = { Text("删除选中的 ${selectedMessages.size} 条消息？此操作不可恢复。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedMessages.forEach { deleteMessage(context, it) }
+                        vm.refresh()
+                        exitMultiSelect()
+                    }
+                ) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmBatchDelete = false }) { Text("取消") }
+            }
+        )
     }
 
     // Full-screen image viewer: pinch/double-tap to zoom, single tap (no
@@ -413,6 +531,15 @@ private fun shareMessage(context: Context, message: SmsMessage) {
     context.startActivity(Intent.createChooser(intent, "分享"))
 }
 
+/** Share plain text via the system chooser (used by multi-select 分享). */
+private fun shareText(context: Context, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "分享"))
+}
+
 /** Copy an MMS part into the gallery (Pictures/Librelab). */
 private fun saveImageToGallery(context: Context, uri: android.net.Uri): Boolean = try {
     val resolver = context.contentResolver
@@ -466,6 +593,10 @@ private fun InitialAvatar(
 private fun MessageBubble(
     message: SmsMessage,
     myInitial: String,
+    multiSelect: Boolean = false,
+    selected: Boolean = false,
+    onToggleSelect: (String) -> Unit = {},
+    onStartMultiSelect: (SmsMessage) -> Unit = {},
     onOpenImage: (android.net.Uri) -> Unit,
     onSaveImage: (android.net.Uri) -> Unit,
     onDelete: (SmsMessage) -> Unit
@@ -482,7 +613,7 @@ private fun MessageBubble(
         ) {
             Column(horizontalAlignment = Alignment.End) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, message, onOpenImage, onSaveImage, onRequestDelete = { confirmDelete = true })
+                    MmsImage(uri, message, onOpenImage, onSaveImage, onStartMultiSelect = { onStartMultiSelect(message) }, onRequestDelete = { confirmDelete = true })
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -492,6 +623,10 @@ private fun MessageBubble(
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
                         container = MaterialTheme.colorScheme.primaryContainer,
                         content = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selected = selected,
+                        multiSelect = multiSelect,
+                        onToggle = { onToggleSelect(message.key) },
+                        onStartMultiSelect = { onStartMultiSelect(message) },
                         onRequestDelete = { confirmDelete = true }
                     )
                 } else if (hasImages) {
@@ -530,7 +665,7 @@ private fun MessageBubble(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.Start) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, message, onOpenImage, onSaveImage, onRequestDelete = { confirmDelete = true })
+                    MmsImage(uri, message, onOpenImage, onSaveImage, onStartMultiSelect = { onStartMultiSelect(message) }, onRequestDelete = { confirmDelete = true })
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -540,6 +675,10 @@ private fun MessageBubble(
                         shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
                         container = MaterialTheme.colorScheme.secondaryContainer,
                         content = MaterialTheme.colorScheme.onSecondaryContainer,
+                        selected = selected,
+                        multiSelect = multiSelect,
+                        onToggle = { onToggleSelect(message.key) },
+                        onStartMultiSelect = { onStartMultiSelect(message) },
                         onRequestDelete = { confirmDelete = true }
                     )
                 } else if (hasImages) {
@@ -581,6 +720,7 @@ private fun MmsImage(
     message: SmsMessage,
     onOpenImage: (android.net.Uri) -> Unit,
     onSaveImage: (android.net.Uri) -> Unit,
+    onStartMultiSelect: () -> Unit = {},
     onRequestDelete: () -> Unit
 ) {
     var menuAt by remember { mutableStateOf<Offset?>(null) }
@@ -606,6 +746,7 @@ private fun MmsImage(
                 hasImages = true,
                 onDismiss = { menuAt = null },
                 onSaveImage = onSaveImage,
+                onStartMultiSelect = onStartMultiSelect,
                 onRequestDelete = onRequestDelete
             )
         }
@@ -620,6 +761,10 @@ private fun BubbleContent(
     shape: RoundedCornerShape,
     container: androidx.compose.ui.graphics.Color,
     content: androidx.compose.ui.graphics.Color,
+    selected: Boolean = false,
+    multiSelect: Boolean = false,
+    onToggle: () -> Unit = {},
+    onStartMultiSelect: () -> Unit = {},
     onRequestDelete: () -> Unit
 ) {
     var menuAt by remember { mutableStateOf<Offset?>(null) }
@@ -627,10 +772,11 @@ private fun BubbleContent(
         Surface(
             shape = shape,
             color = container,
+            border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(
-                    onTap = {},
-                    onLongPress = { menuAt = it }
+                    onTap = { if (multiSelect) onToggle() },
+                    onLongPress = { if (multiSelect) onToggle() else menuAt = it }
                 )
             }
         ) {
@@ -661,6 +807,7 @@ private fun BubbleContent(
                 hasImages = false,
                 onDismiss = { menuAt = null },
                 onSaveImage = {},
+                onStartMultiSelect = onStartMultiSelect,
                 onRequestDelete = onRequestDelete
             )
         }
@@ -675,6 +822,7 @@ private fun MessageActionMenu(
     hasImages: Boolean,
     onDismiss: () -> Unit,
     onSaveImage: (android.net.Uri) -> Unit,
+    onStartMultiSelect: () -> Unit = {},
     onRequestDelete: () -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
@@ -684,6 +832,13 @@ private fun MessageActionMenu(
         onDismissRequest = onDismiss
     ) {
         DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
+            DropdownMenuItem(
+                text = { Text("多选") },
+                onClick = {
+                    onDismiss()
+                    onStartMultiSelect()
+                }
+            )
             if (message.body.isNotBlank()) {
                 DropdownMenuItem(
                     text = { Text("复制") },

@@ -205,7 +205,11 @@ fun SmartCodeCard(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(allCodes, key = { "${it.key}_${it.code}" }) { codeMsg ->
-                        CodeCardRow(codeMsg = codeMsg, onCopy = onCopy)
+                        CodeCardRow(
+                            codeMsg = codeMsg,
+                            onCopy = onCopy,
+                            onOpenOriginal = onOpenOriginal
+                        )
                     }
                 }
             }
@@ -216,7 +220,8 @@ fun SmartCodeCard(
 @Composable
 private fun CodeCardRow(
     codeMsg: SmsMessage,
-    onCopy: (String) -> Unit
+    onCopy: (String) -> Unit,
+    onOpenOriginal: (SmsMessage) -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -259,17 +264,34 @@ private fun CodeCardRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-            IconButton(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Text(
+                        text = formatSendTime(codeMsg.date),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { onOpenOriginal(codeMsg) },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                    ) {
+                        Text("原始短信", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                }
+                IconButton(
                 onClick = { codeMsg.code?.let(onCopy) },
                 enabled = codeMsg.hasCode
-            ) {
+                ) {
                 Icon(
                     imageVector = MaterialSymbols.Outlined.Content_copy,
                     contentDescription = "复制",
                     tint = MaterialTheme.colorScheme.primary
                 )
-            }
+                }
         }
     }
 }

@@ -61,6 +61,22 @@ object SmsParser {
         return matches.minByOrNull { kotlin.math.abs(text.indexOf(it) - keywordIndex) }
     }
 
+    /**
+     * All codes in one message. Express pickup SMS can carry several
+     * cabinet numbers for several parcels:
+     * 【多多代收点】…取货码1-3-9448、5-4-3216 → [1-3-9448, 5-4-3216]
+     */
+    fun extractAllCodes(body: String): List<String> {
+        val text = body.replace(" ", "")
+        if (text.contains("取货码")) {
+            val from = text.indexOf("取货码")
+            val all = Regex("[\\d]+-[\\d]+-[\\d]+").findAll(text.substring(from))
+                .map { it.value }.toList()
+            if (all.isNotEmpty()) return all
+        }
+        return extractCode(body)?.let { listOf(it) } ?: emptyList()
+    }
+
     /** Format a 6-digit code as "XXX XXX" for the smart card display. */
     fun formatCode(code: String): String =
         if (code.length == 6) "${code.substring(0, 3)} ${code.substring(3)}" else code

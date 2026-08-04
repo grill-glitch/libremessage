@@ -339,17 +339,8 @@ private fun SmsListContent(
         item {
             SmartCodeCard(
                 message = state.latestCode,
-                allCodes = state.allCodes,
+                allCodes = state.allCodeEntries,
                 onCopy = onCopyCode
-            )
-        }
-        item {
-            SmartCodeCard(
-                message = state.latestPickup,
-                allCodes = state.allPickups,
-                onCopy = onCopyCode,
-                fallbackLabel = "取件码",
-                emptyText = "暂无取件码短信"
             )
         }
         item { FilterChipRow(selected = state.filter, onSelect = onFilter) }

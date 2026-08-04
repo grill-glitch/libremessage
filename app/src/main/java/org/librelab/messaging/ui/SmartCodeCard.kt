@@ -55,8 +55,6 @@ fun SmartCodeCard(
     message: SmsMessage?,
     allCodes: List<SmsMessage> = emptyList(),
     onCopy: (String) -> Unit,
-    fallbackLabel: String = "验证码",
-    emptyText: String = "暂无验证码短信",
     modifier: Modifier = Modifier
 ) {
     var showSheet by remember { mutableStateOf(false) }
@@ -81,21 +79,21 @@ fun SmartCodeCard(
                     } else {
                         MaterialSymbols.Outlined.Safety_check
                     },
-                    contentDescription = message?.codeLabel ?: fallbackLabel,
+                    contentDescription = message?.codeLabel ?: "验证码",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = message?.merchantName ?: fallbackLabel,
+                        text = message?.merchantName ?: "验证码",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = message?.codeLabel ?: fallbackLabel,
+                        text = message?.codeLabel ?: "验证码",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -142,7 +140,7 @@ fun SmartCodeCard(
             // Footer row
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = message?.body ?: emptyText,
+                    text = message?.body ?: "暂无验证码短信",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -181,7 +179,7 @@ fun SmartCodeCard(
                         .sizeIn(maxHeight = 480.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(allCodes, key = { it.key }) { codeMsg ->
+                    items(allCodes, key = { "${it.key}_${it.code}" }) { codeMsg ->
                         CodeCardRow(codeMsg = codeMsg, onCopy = onCopy)
                     }
                 }

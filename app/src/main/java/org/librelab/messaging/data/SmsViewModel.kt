@@ -31,31 +31,19 @@ data class UiState(
     val threadMessages: List<SmsMessage> = emptyList(),
     val loading: Boolean = true
 ) {
-    /** Latest code message pinned to the top smart card. */
+    /** Latest code/express message pinned to the smart banner. */
     val latestCode: SmsMessage?
-        get() = codeMessages.maxByOrNull { it.date }
+        get() = allCodeEntries.maxByOrNull { it.date }
 
-    /** Latest express pickup message pinned to the pickup smart card. */
-    val latestPickup: SmsMessage?
-        get() = pickupMessages.maxByOrNull { it.date }
-
-    /** Verification-code messages (smart card expanded list). */
-    val allCodes: List<SmsMessage>
-        get() = codeMessages.sortedByDescending { it.date }
-
-    /** Express pickup-code messages (pickup card expanded list). */
-    val allPickups: List<SmsMessage>
-        get() = pickupMessages.sortedByDescending { it.date }
-
-    private val codeMessages: List<SmsMessage>
-        get() = messages.filter {
-            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "验证码"
-        }
-
-    private val pickupMessages: List<SmsMessage>
-        get() = messages.filter {
-            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "取件码"
-        }
+    /** All code + express messages for the expanded list. Express messages
+     * are split per cabinet number: 【多多代收点】…取货码1-3-9448、5-4-3216
+     * yields two entries (one per parcel). */
+    val allCodeEntries: List<SmsMessage>
+        get() = messages.filter { it.category == MessageCategory.CODE }
+            .flatMap { msg ->
+                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
+            }
+            .sortedByDescending { it.date }
 
     /** Messages after applying filter chip + search query. */
     val visibleMessages: List<SmsMessage>

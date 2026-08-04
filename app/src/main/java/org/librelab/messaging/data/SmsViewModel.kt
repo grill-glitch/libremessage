@@ -29,7 +29,8 @@ data class UiState(
     val showSettings: Boolean = false,
     val selectedThreadId: Long? = null,
     val threadMessages: List<SmsMessage> = emptyList(),
-    val loading: Boolean = true
+    val loading: Boolean = true,
+    val showAdsInAll: Boolean = false
 ) {
     /** Latest code/express message pinned to the smart banner. */
     val latestCode: SmsMessage?
@@ -71,8 +72,12 @@ data class UiState(
     val visibleMessages: List<SmsMessage>
         get() {
             val q = searchQuery.trim()
+            // 设置里关闭"全部标签显示广告"时,把广告从全部列表剔除
+            // (广告标签仍可单独查看)。
+            val hideAdsInAll = filter == SmsFilter.ALL && !showAdsInAll
             return messages.filter { m ->
-                filter.matches(m.category, m.body) &&
+                (!hideAdsInAll || m.category != MessageCategory.AD) &&
+                    filter.matches(m.category, m.body) &&
                     (q.isEmpty() || m.body.contains(q, ignoreCase = true) || m.address.contains(q, ignoreCase = true))
             }
         }
@@ -118,7 +123,13 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         val isDefault = runCatching {
             Telephony.Sms.getDefaultSmsPackage(app) == app.packageName
         }.getOrDefault(false)
-        _state.update { it.copy(hasSmsPermission = hasSms, isDefaultSmsApp = isDefault) }
+        _state.update {
+            it.copy(
+                hasSmsPermission = hasSms,
+                isDefaultSmsApp = isDefault,
+                showAdsInAll = repository.showAdsInAll()
+            )
+        }
         if (!hasSms) {
             _state.update { it.copy(loading = false) }
             return
@@ -196,6 +207,12 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     fun setSearchActive(active: Boolean) = _state.update { it.copy(searchActive = active) }
 
     fun setShowSettings(show: Boolean) = _state.update { it.copy(showSettings = show) }
+
+    /** 全部标签是否显示广告短信(设置项,持久化)。 */
+    fun setShowAdsInAll(show: Boolean) {
+        repository.setShowAdsInAll(show)
+        _state.update { it.copy(showAdsInAll = show) }
+    }
 
     fun setTab(tab: Int) {
         _state.update { it.copy(tab = tab) }

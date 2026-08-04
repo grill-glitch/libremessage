@@ -55,6 +55,18 @@ class SmsRepository(private val context: Context) {
             .apply()
     }
 
+    /** Whether ad messages are shown on the 全部 filter (settings). */
+    fun showAdsInAll(): Boolean =
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .getBoolean("show_ads_in_all", false)
+
+    fun setShowAdsInAll(show: Boolean) {
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("show_ads_in_all", show)
+            .apply()
+    }
+
     /** Permanently delete a conversation (all its sms + mms rows). */
     suspend fun deleteThread(threadId: Long): Boolean = withContext(Dispatchers.IO) {
         try {

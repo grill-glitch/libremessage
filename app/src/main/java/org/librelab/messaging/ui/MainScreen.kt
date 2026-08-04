@@ -47,6 +47,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -205,7 +207,9 @@ fun MainScreen(
     if (state.showSettings) {
         SettingsScreen(
             isDefaultSmsApp = state.isDefaultSmsApp,
+            showAdsInAll = state.showAdsInAll,
             onSetDefaultApp = onSetDefaultApp,
+            onToggleAdsInAll = { vm.setShowAdsInAll(it) },
             onBack = { vm.setShowSettings(false) }
         )
         return
@@ -577,7 +581,9 @@ private fun SetupCard(
 @Composable
 private fun SettingsScreen(
     isDefaultSmsApp: Boolean,
+    showAdsInAll: Boolean,
     onSetDefaultApp: () -> Unit,
+    onToggleAdsInAll: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -627,6 +633,31 @@ private fun SettingsScreen(
                 OutlinedButton(onClick = onSetDefaultApp) {
                     Text("设为默认短信应用")
                 }
+            }
+
+            HorizontalDivider()
+
+            // 全部标签显示广告短信
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "全部标签显示广告短信",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "关闭后，广告短信只在“广告”标签中显示",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = showAdsInAll,
+                    onCheckedChange = onToggleAdsInAll
+                )
             }
         }
     }

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import org.librelab.messaging.R
 import org.librelab.messaging.data.MessageCategory
 import org.librelab.messaging.data.SmsParser
 
@@ -29,7 +30,7 @@ class SmsReceiver : BroadcastReceiver() {
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
         val sms = messages.firstOrNull() ?: return
         val body = sms.displayMessageBody ?: return
-        val address = sms.originatingAddress ?: "未知号码"
+        val address = sms.originatingAddress ?: context.getString(R.string.unknown_sender)
         if (!dedup(address, body)) return
         // Default SMS app: persist the SMS_DELIVER message, then notify.
         if (action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {

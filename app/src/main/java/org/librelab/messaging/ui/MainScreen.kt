@@ -86,6 +86,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -312,18 +313,22 @@ private fun HomeScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除会话") },
-            text = { Text("删除选中的 ${selectedIds.size} 个会话？此操作不可恢复。") },
+            title = { Text(stringResource(R.string.dialog_delete_thread_title)) },
+            text = {
+                Text(stringResource(R.string.dialog_delete_thread_body, selectedIds.size))
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         vm.deleteThreads(selectedIds.toList())
                         exitSelection()
                     }
-                ) { Text("删除") }
+                ) { Text(stringResource(R.string.action_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
         )
     }
@@ -335,14 +340,14 @@ private fun HomeScreen(
                 title = {
                     when {
                         selectionMode -> Text(
-                            text = "已选 ${selectedIds.size} 项",
+                            text = stringResource(R.string.selected_count, selectedIds.size),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         state.searchActive -> TextField(
                             value = state.searchQuery,
                             onValueChange = vm::setSearchQuery,
-                            placeholder = { Text("搜索短信") },
+                            placeholder = { Text(stringResource(R.string.placeholder_search_sms)) },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -355,7 +360,7 @@ private fun HomeScreen(
                                 .focusRequester(searchFocus)
                         )
                         else -> Text(
-                            text = "短信",
+                            text = stringResource(R.string.tab_sms),
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.onBackground
                         )
@@ -375,7 +380,7 @@ private fun HomeScreen(
                                 } else {
                                     MaterialSymbols.Outlined.Select_all
                                 },
-                                contentDescription = "全选",
+                                contentDescription = stringResource(R.string.action_select_all),
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
@@ -388,7 +393,11 @@ private fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = MaterialSymbols.Outlined.Archive,
-                                contentDescription = if (state.filter == SmsFilter.ARCHIVED) "取消归档" else "归档",
+                                contentDescription = if (state.filter == SmsFilter.ARCHIVED) {
+                                    stringResource(R.string.action_unarchive)
+                                } else {
+                                    stringResource(R.string.action_archive)
+                                },
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
@@ -398,7 +407,7 @@ private fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = MaterialSymbols.Outlined.Delete,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.action_delete),
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
@@ -408,7 +417,7 @@ private fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = MaterialSymbols.Outlined.Close,
-                                contentDescription = "取消选择",
+                                contentDescription = stringResource(R.string.action_cancel_selection),
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
@@ -426,7 +435,11 @@ private fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = if (state.searchActive) MaterialSymbols.Outlined.Close else MaterialSymbols.Outlined.Search,
-                                contentDescription = if (state.searchActive) "关闭搜索" else "搜索",
+                                contentDescription = if (state.searchActive) {
+                                    stringResource(R.string.action_close_search)
+                                } else {
+                                    stringResource(R.string.action_search)
+                                },
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
@@ -436,7 +449,7 @@ private fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = MaterialSymbols.Outlined.Settings,
-                                contentDescription = "设置",
+                                contentDescription = stringResource(R.string.action_settings),
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
@@ -456,7 +469,7 @@ private fun HomeScreen(
             ) {
                 Icon(
                     imageVector = MaterialSymbols.Outlined.Edit,
-                    contentDescription = "新建短信",
+                    contentDescription = stringResource(R.string.action_new_sms),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
@@ -467,7 +480,7 @@ private fun HomeScreen(
                     selected = state.tab == 0,
                     onClick = { vm.setTab(0) },
                     icon = { Icon(MaterialSymbols.Outlined.Chat, contentDescription = null) },
-                    label = { Text("短信") }
+                    label = { Text(stringResource(R.string.tab_sms)) }
                 )
                 NavigationBarItem(
                     selected = state.tab == 1,
@@ -476,7 +489,7 @@ private fun HomeScreen(
                         vm.loadContacts()
                     },
                     icon = { Icon(MaterialSymbols.Outlined.Group, contentDescription = null) },
-                    label = { Text("联系人") }
+                    label = { Text(stringResource(R.string.tab_contacts)) }
                 )
             }
         }
@@ -542,18 +555,18 @@ private fun SmsListContent(
         if (!state.hasSmsPermission) {
             item {
                 SetupCard(
-                    title = "需要短信权限",
-                    body = "授权后即可读取系统短信并自动提取验证码",
-                    buttonText = "授权",
+                    title = stringResource(R.string.setup_permission_title),
+                    body = stringResource(R.string.setup_permission_body),
+                    buttonText = stringResource(R.string.action_grant),
                     onClick = onRequestPermission
                 )
             }
         } else if (!state.isDefaultSmsApp) {
             item {
                 SetupCard(
-                    title = "尚未设为默认短信应用",
-                    body = "设为默认后才能读取短信数据库",
-                    buttonText = "去设置",
+                    title = stringResource(R.string.setup_default_title),
+                    body = stringResource(R.string.setup_default_body),
+                    buttonText = stringResource(R.string.action_go_settings),
                     onClick = onSetDefaultApp
                 )
             }
@@ -577,7 +590,7 @@ private fun SmsListContent(
         if (state.filter == SmsFilter.CODE) {
             val codes = state.codeEntries
             if (codes.isEmpty()) {
-                item { EmptyBox("暂无验证码短信") }
+                item { EmptyBox(stringResource(R.string.empty_codes)) }
             } else {
                 items(codes, key = { "${it.key}_${it.code}" }) { msg ->
                     CodeCardRow(
@@ -590,7 +603,7 @@ private fun SmsListContent(
         } else if (state.filter == SmsFilter.PACKAGE) {
             val pickups = state.allPickups
             if (pickups.isEmpty()) {
-                item { EmptyBox("暂无取件码短信") }
+                item { EmptyBox(stringResource(R.string.empty_pickups)) }
             } else {
                 items(pickups, key = { "${it.key}_${it.code}" }) { msg ->
                     CodeCardRow(
@@ -603,7 +616,7 @@ private fun SmsListContent(
         } else {
             val threads = state.visibleThreads
             if (threads.isEmpty()) {
-                item { EmptyBox("暂无短信") }
+                item { EmptyBox(stringResource(R.string.empty_sms)) }
             } else {
                 items(threads, key = { it.message.threadId }) { thread ->
                     MessageItem(
@@ -688,12 +701,12 @@ private fun SettingsScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
+                title = { Text(stringResource(R.string.action_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = MaterialSymbols.Outlined.Arrow_back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.action_back),
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
@@ -712,24 +725,24 @@ private fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "默认短信应用",
+                text = stringResource(R.string.settings_default_app),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
             if (isDefaultSmsApp) {
                 Text(
-                    text = "当前已是系统默认短信应用",
+                    text = stringResource(R.string.settings_default_app_active),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Text(
-                    text = "设为默认短信应用后，本应用才能读取系统短信数据库。",
+                    text = stringResource(R.string.settings_default_app_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 OutlinedButton(onClick = onSetDefaultApp) {
-                    Text("设为默认短信应用")
+                    Text(stringResource(R.string.action_set_default_app))
                 }
             }
 
@@ -742,12 +755,12 @@ private fun SettingsScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "全部标签显示广告短信",
+                        text = stringResource(R.string.settings_ads_in_all),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "关闭后，广告短信只在“广告”标签中显示",
+                        text = stringResource(R.string.settings_ads_in_all_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -767,12 +780,12 @@ private fun SettingsScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "广告短信静音",
+                        text = stringResource(R.string.settings_mute_ads),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "广告短信仍会保存到短信列表，但不再弹出系统通知",
+                        text = stringResource(R.string.settings_mute_ads_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -792,12 +805,12 @@ private fun SettingsScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "验证码自动复制",
+                        text = stringResource(R.string.settings_auto_copy),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "收到验证码短信时，自动把验证码复制到剪贴板",
+                        text = stringResource(R.string.settings_auto_copy_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -830,5 +843,5 @@ private fun defaultSmsRequestIntent(context: Context): Intent? {
 private fun copyCode(context: Context, code: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText("sms_code", code))
-    Toast.makeText(context, R.string.code_copied, Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, R.string.toast_code_copied, Toast.LENGTH_SHORT).show()
 }

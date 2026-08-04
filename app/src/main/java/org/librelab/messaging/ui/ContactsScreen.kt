@@ -28,8 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.librelab.messaging.R
 import org.librelab.messaging.data.ContactInfo
 
 /** 联系人 tab — real contacts from ContactsContract, tap to compose. */
@@ -42,7 +44,7 @@ fun ContactsScreen(
     if (contacts.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                text = "暂无联系人",
+                text = stringResource(R.string.empty_contacts),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

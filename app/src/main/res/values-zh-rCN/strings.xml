@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">短信</string>
+    <string name="tab_sms">短信</string>
+    <string name="tab_contacts">联系人</string>
+
+    <!-- Filters -->
+    <string name="filter_all">全部</string>
+    <string name="filter_code">验证码</string>
+    <string name="filter_package">包裹</string>
+    <string name="filter_ad">广告</string>
+    <string name="filter_archived">归档</string>
+
+    <!-- Titles / placeholders -->
+    <string name="title_new_sms">新短信</string>
+    <string name="placeholder_search_sms">搜索短信</string>
+    <string name="placeholder_input_sms">输入短信...</string>
+    <string name="recipient">收件人</string>
+    <string name="sms_body">短信内容</string>
+
+    <!-- Actions -->
+    <string name="action_delete">删除</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_share">分享</string>
+    <string name="action_copy">复制</string>
+    <string name="action_send">发送</string>
+    <string name="action_sending">发送中…</string>
+    <string name="action_back">返回</string>
+    <string name="action_settings">设置</string>
+    <string name="action_search">搜索</string>
+    <string name="action_close_search">关闭搜索</string>
+    <string name="action_select_all">全选</string>
+    <string name="action_deselect">取消选择</string>
+    <string name="action_cancel_selection">取消选择</string>
+    <string name="action_archive">归档</string>
+    <string name="action_unarchive">取消归档</string>
+    <string name="action_new_sms">新建短信</string>
+    <string name="action_more">更多</string>
+    <string name="action_dial">拨号</string>
+    <string name="action_multi_select">多选</string>
+    <string name="action_save_image">保存图片</string>
+    <string name="action_remove_image">移除图片</string>
+    <string name="action_attach">附件</string>
+    <string name="action_grant">授权</string>
+    <string name="action_go_settings">去设置</string>
+    <string name="action_set_default_app">设为默认短信应用</string>
+    <string name="action_view_original">原始短信</string>
+    <string name="action_copy_code">复制验证码</string>
+    <string name="action_view_all_codes">查看全部验证码</string>
+    <string name="action_selected">已选择</string>
+    <string name="selected_count">已选 %1$d 项</string>
+
+    <!-- Smart card -->
+    <string name="code_verification">验证码</string>
+    <string name="code_pickup">取件码</string>
+    <string name="smart_card_empty">暂无验证码短信</string>
+    <string name="all_codes_title">所有验证码与取件码 (%1$d)</string>
+    <string name="image_message">[图片] %1$s</string>
+    <string name="image">图片</string>
+    <string name="image_attachment">图片附件</string>
+    <string name="pending_image">待发送图片</string>
+
+    <!-- Empty states -->
+    <string name="empty_sms">暂无短信</string>
+    <string name="empty_codes">暂无验证码短信</string>
+    <string name="empty_pickups">暂无取件码短信</string>
+    <string name="empty_contacts">暂无联系人</string>
+    <string name="empty_contact_match">无匹配联系人</string>
+
+    <!-- Setup card -->
+    <string name="setup_permission_title">需要短信权限</string>
+    <string name="setup_permission_body">授权后即可读取系统短信并自动提取验证码</string>
+    <string name="setup_default_title">尚未设为默认短信应用</string>
+    <string name="setup_default_body">设为默认后才能读取短信数据库</string>
+
+    <!-- Settings -->
+    <string name="settings_default_app">默认短信应用</string>
+    <string name="settings_default_app_active">当前已是系统默认短信应用</string>
+    <string name="settings_default_app_hint">设为默认短信应用后，本应用才能读取系统短信数据库。</string>
+    <string name="settings_ads_in_all">全部标签显示广告短信</string>
+    <string name="settings_ads_in_all_hint">关闭后，广告短信只在“广告”标签中显示</string>
+    <string name="settings_mute_ads">广告短信静音</string>
+    <string name="settings_mute_ads_hint">广告短信仍会保存到短信列表，但不再弹出系统通知</string>
+    <string name="settings_auto_copy">验证码自动复制</string>
+    <string name="settings_auto_copy_hint">收到验证码短信时，自动把验证码复制到剪贴板</string>
+
+    <!-- Toasts -->
+    <string name="toast_code_copied">验证码已复制到剪贴板</string>
+    <string name="toast_copied">已复制</string>
+    <string name="toast_copied_count">已复制 %1$d 条</string>
+    <string name="toast_saved_to_gallery">已保存到相册</string>
+    <string name="toast_save_failed">保存失败</string>
+    <string name="toast_sms_sent">短信已发送</string>
+    <string name="toast_send_failed">发送失败: %1$s</string>
+    <string name="toast_mms_failed">彩信发送失败</string>
+    <string name="toast_mms_data_required">彩信发送失败: 请允许 MMS 数据连接后重试</string>
+    <string name="toast_enter_recipient">请先输入收件人号码</string>
+    <string name="toast_no_send_permission">无发送短信权限</string>
+    <string name="toast_delete_failed">删除失败</string>
+    <string name="toast_more_wip">更多功能开发中</string>
+    <string name="toast_read_image_failed">读取图片失败</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_delete_thread_title">删除会话</string>
+    <string name="dialog_delete_thread_body">删除选中的 %1$d 个会话？此操作不可恢复。</string>
+    <string name="dialog_delete_message_title">删除消息</string>
+    <string name="dialog_delete_message_body">删除选中的 %1$d 条消息？此操作不可恢复。</string>
+    <string name="dialog_delete_single_title">删除这条消息?</string>
+    <string name="dialog_delete_irreversible">删除后不可恢复</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_sms">新短信通知</string>
+    <string name="copy_code">复制验证码</string>
+    <string name="mms_title">收到一条彩信</string>
+    <string name="mms_body">当前版本暂不支持查看彩信，请使用其他应用</string>
+    <string name="unknown_sender">未知号码</string>
+
+    <!-- Time -->
+    <string name="time_just_now">刚刚</string>
+    <string name="time_minutes_ago">%1$d分钟前</string>
+    <string name="time_yesterday">昨天</string>
+    <string name="date_format_month_day">M月d日</string>
+    <string name="date_format_year_month_day">yyyy/M/d</string>
+
+    <!-- Misc -->
+    <string name="me">我</string>
+    <string name="default_app_unavailable">系统未提供默认短信设置入口，请到 设置 → 应用 → 默认应用 中手动修改</string>
+    <string name="share_chooser_title">分享</string>
+</resources>

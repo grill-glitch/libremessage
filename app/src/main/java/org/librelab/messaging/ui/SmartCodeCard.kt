@@ -42,8 +42,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.librelab.messaging.R
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsParser
 import java.text.SimpleDateFormat
@@ -73,11 +75,13 @@ fun SmartCodeCard(
     allCodes: List<SmsMessage> = emptyList(),
     onCopy: (String) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit = {},
-    fallbackLabel: String = "验证码",
-    emptyText: String = "暂无验证码短信",
+    fallbackLabel: String = "",
+    emptyText: String = "",
     modifier: Modifier = Modifier
 ) {
     var showSheet by remember { mutableStateOf(false) }
+    val fallback = fallbackLabel.ifBlank { stringResource(R.string.code_verification) }
+    val empty = emptyText.ifBlank { stringResource(R.string.smart_card_empty) }
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -94,26 +98,34 @@ fun SmartCodeCard(
             // package (box) for 取件码; no highlight container.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (message?.codeLabel == "取件码") {
+                    imageVector = if (message?.isPickupCode == true) {
                         MaterialSymbols.Outlined.Package_2
                     } else {
                         MaterialSymbols.Outlined.Safety_check
                     },
-                    contentDescription = message?.codeLabel ?: fallbackLabel,
+                    contentDescription = if (message?.isPickupCode == true) {
+                        stringResource(R.string.code_pickup)
+                    } else {
+                        fallback
+                    },
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = message?.merchantName ?: fallbackLabel,
+                        text = message?.merchantName ?: fallback,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = message?.codeLabel ?: fallbackLabel,
+                        text = if (message?.isPickupCode == true) {
+                            stringResource(R.string.code_pickup)
+                        } else {
+                            fallback
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -124,7 +136,7 @@ fun SmartCodeCard(
                 ) {
                     Icon(
                         imageVector = MaterialSymbols.Outlined.Chevron_right,
-                        contentDescription = "查看全部验证码",
+                        contentDescription = stringResource(R.string.action_view_all_codes),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -151,7 +163,7 @@ fun SmartCodeCard(
                 ) {
                     Icon(
                         imageVector = MaterialSymbols.Outlined.Content_copy,
-                        contentDescription = "复制验证码",
+                        contentDescription = stringResource(R.string.action_copy_code),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -159,7 +171,7 @@ fun SmartCodeCard(
 
             // Body row
             Text(
-                text = message?.body ?: emptyText,
+                text = message?.body ?: empty,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -178,7 +190,7 @@ fun SmartCodeCard(
                     enabled = message != null,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("原始短信", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.action_view_original), style = MaterialTheme.typography.labelMedium)
                 }
                 Spacer(Modifier.width(4.dp))
                 Text(
@@ -202,7 +214,7 @@ fun SmartCodeCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "所有验证码与取件码 (${allCodes.size})",
+                    text = stringResource(R.string.all_codes_title, allCodes.size),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -249,7 +261,7 @@ internal fun CodeCardRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = if (codeMsg.codeLabel == "取件码") {
+                    imageVector = if (codeMsg.isPickupCode) {
                         MaterialSymbols.Outlined.Package_2
                     } else {
                         MaterialSymbols.Outlined.Safety_check
@@ -301,7 +313,7 @@ internal fun CodeCardRow(
                     onClick = { onOpenOriginal(codeMsg) },
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
                 ) {
-                    Text("原始短信", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.action_view_original), style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton(
                     onClick = { codeMsg.code?.let(onCopy) },
@@ -310,7 +322,7 @@ internal fun CodeCardRow(
                 ) {
                     Icon(
                         imageVector = MaterialSymbols.Outlined.Content_copy,
-                        contentDescription = "复制",
+                        contentDescription = stringResource(R.string.action_copy),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )

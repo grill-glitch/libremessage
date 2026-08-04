@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.window.Popup
@@ -109,6 +110,7 @@ import com.composables.icons.materialsymbols.outlined.Done_all
 import com.composables.icons.materialsymbols.outlined.Error
 import com.composables.icons.materialsymbols.outlined.More_vert
 import com.composables.icons.materialsymbols.outlined.Send
+import org.librelab.messaging.R
 import org.librelab.messaging.SmsSentReceiver
 import org.librelab.messaging.data.ContactInfo
 import org.librelab.messaging.data.SendStatus
@@ -195,7 +197,7 @@ fun ThreadDetailScreen(
                 }
                 pendingImage = file
             } catch (e: Exception) {
-                Toast.makeText(context, "读取图片失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_read_image_failed, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -235,7 +237,7 @@ fun ThreadDetailScreen(
                 title = {
                     if (multiSelect) {
                         Text(
-                            text = "已选 ${selectedKeys.size} 项",
+                            text = stringResource(R.string.selected_count, selectedKeys.size),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -246,7 +248,7 @@ fun ThreadDetailScreen(
                         OutlinedTextField(
                             value = newNumber,
                             onValueChange = { newNumber = it },
-                            placeholder = { Text("新短信") },
+                            placeholder = { Text(stringResource(R.string.title_new_sms)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             colors = TextFieldDefaults.colors(
@@ -287,7 +289,11 @@ fun ThreadDetailScreen(
                     ) {
                         Icon(
                             imageVector = if (multiSelect) MaterialSymbols.Outlined.Close else MaterialSymbols.Outlined.Arrow_back,
-                            contentDescription = if (multiSelect) "取消选择" else "返回",
+                            contentDescription = if (multiSelect) {
+                                stringResource(R.string.action_cancel_selection)
+                            } else {
+                                stringResource(R.string.action_back)
+                            },
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -301,7 +307,7 @@ fun ThreadDetailScreen(
                         ) {
                             Icon(
                                 imageVector = if (allSelected) MaterialSymbols.Outlined.Deselect else MaterialSymbols.Outlined.Select_all,
-                                contentDescription = "全选",
+                                contentDescription = stringResource(R.string.action_select_all),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -310,14 +316,18 @@ fun ThreadDetailScreen(
                                 val text = selectedMessages.joinToString("\n") { it.body }
                                 if (text.isNotBlank()) {
                                     clipboard.setText(AnnotatedString(text))
-                                    Toast.makeText(context, "已复制 ${selectedMessages.size} 条", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.toast_copied_count, selectedMessages.size),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                                 exitMultiSelect()
                             }
                         ) {
                             Icon(
                                 imageVector = MaterialSymbols.Outlined.Content_copy,
-                                contentDescription = "复制",
+                                contentDescription = stringResource(R.string.action_copy),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -330,7 +340,7 @@ fun ThreadDetailScreen(
                         ) {
                             Icon(
                                 imageVector = MaterialSymbols.Outlined.Share,
-                                contentDescription = "分享",
+                                contentDescription = stringResource(R.string.action_share),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -339,7 +349,7 @@ fun ThreadDetailScreen(
                         ) {
                             Icon(
                                 imageVector = MaterialSymbols.Outlined.Delete,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.action_delete),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -354,13 +364,21 @@ fun ThreadDetailScreen(
                                 }
                             }
                         ) {
-                            Icon(MaterialSymbols.Outlined.Call, contentDescription = "拨号", tint = MaterialTheme.colorScheme.onSurface)
+                            Icon(
+                                MaterialSymbols.Outlined.Call,
+                                contentDescription = stringResource(R.string.action_dial),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                         IconButton(onClick = {
-                        Toast.makeText(context, "更多功能开发中", Toast.LENGTH_SHORT).show()
-                    }) {
-                        Icon(MaterialSymbols.Outlined.More_vert, contentDescription = "更多", tint = MaterialTheme.colorScheme.onSurface)
-                    }
+                            Toast.makeText(context, R.string.toast_more_wip, Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(
+                                MaterialSymbols.Outlined.More_vert,
+                                contentDescription = stringResource(R.string.action_more),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -380,13 +398,13 @@ fun ThreadDetailScreen(
                     val text = input.trim()
                                     if (text.isEmpty() && pendingImage == null) return@MessageInputBar
                     if (targetAddress.isBlank()) {
-                        Toast.makeText(context, "请先输入收件人号码", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_enter_recipient, Toast.LENGTH_SHORT).show()
                         return@MessageInputBar
                     }
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) !=
                         PackageManager.PERMISSION_GRANTED
                     ) {
-                        Toast.makeText(context, "无发送短信权限", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_no_send_permission, Toast.LENGTH_SHORT).show()
                         return@MessageInputBar
                     }
                     val image = pendingImage
@@ -416,7 +434,7 @@ fun ThreadDetailScreen(
                                 } else {
                                     Toast.makeText(
                                         context,
-                                        "彩信发送失败: 请允许 MMS 数据连接后重试",
+                                        R.string.toast_mms_data_required,
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
@@ -441,7 +459,11 @@ fun ThreadDetailScreen(
                             true
                         } catch (e: Exception) {
                             vm.markSmsFailed(recordId)
-                            Toast.makeText(context, "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.toast_send_failed, e.message),
+                                Toast.LENGTH_SHORT
+                            ).show()
                             false
                         }
                     }
@@ -450,7 +472,7 @@ fun ThreadDetailScreen(
                         input = ""
                         vm.refresh() // ContentObserver also fires; refresh re-loads the thread
                     } else if (image != null) {
-                        Toast.makeText(context, "彩信发送失败", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_mms_failed, Toast.LENGTH_SHORT).show()
                     }
                 }
             )
@@ -473,7 +495,7 @@ fun ThreadDetailScreen(
                     if (filteredContacts.isEmpty()) {
                         item {
                             Text(
-                                text = "无匹配联系人",
+                                text = stringResource(R.string.empty_contact_match),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(vertical = 8.dp)
@@ -519,7 +541,7 @@ fun ThreadDetailScreen(
             items(messages.asReversed(), key = { it.key }) { message ->
                 MessageBubble(
                     message = message,
-                    myInitial = "我",
+                    myInitial = stringResource(R.string.me),
                     multiSelect = multiSelect,
                     selected = message.key in selectedKeys,
                     onToggleSelect = { key ->
@@ -534,7 +556,7 @@ fun ThreadDetailScreen(
                         val saved = saveImageToGallery(context, uri)
                         Toast.makeText(
                             context,
-                            if (saved) "已保存到相册" else "保存失败",
+                            if (saved) R.string.toast_saved_to_gallery else R.string.toast_save_failed,
                             Toast.LENGTH_SHORT
                         ).show()
                     },
@@ -552,8 +574,10 @@ fun ThreadDetailScreen(
     if (confirmBatchDelete) {
         AlertDialog(
             onDismissRequest = { confirmBatchDelete = false },
-            title = { Text("删除消息") },
-            text = { Text("删除选中的 ${selectedMessages.size} 条消息？此操作不可恢复。") },
+            title = { Text(stringResource(R.string.dialog_delete_message_title)) },
+            text = {
+                Text(stringResource(R.string.dialog_delete_message_body, selectedMessages.size))
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -561,10 +585,12 @@ fun ThreadDetailScreen(
                         vm.refresh()
                         exitMultiSelect()
                     }
-                ) { Text("删除") }
+                ) { Text(stringResource(R.string.action_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmBatchDelete = false }) { Text("取消") }
+                TextButton(onClick = { confirmBatchDelete = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
         )
     }
@@ -594,7 +620,7 @@ fun ThreadDetailScreen(
             ) {
                 AsyncImage(
                     model = uri,
-                    contentDescription = "图片",
+                    contentDescription = stringResource(R.string.image),
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .fillMaxSize()
@@ -624,7 +650,7 @@ private fun deleteMessage(context: Context, message: SmsMessage) {
             )
         }
     } catch (e: Exception) {
-        Toast.makeText(context, "删除失败", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.toast_delete_failed, Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -640,7 +666,7 @@ private fun shareMessage(context: Context, message: SmsMessage) {
             putExtra(Intent.EXTRA_TEXT, message.body)
         }
     }
-    context.startActivity(Intent.createChooser(intent, "分享"))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_chooser_title)))
 }
 
 /** Share plain text via the system chooser (used by multi-select 分享). */
@@ -649,7 +675,7 @@ private fun shareText(context: Context, text: String) {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, text)
     }
-    context.startActivity(Intent.createChooser(intent, "分享"))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_chooser_title)))
 }
 
 /** Copy an MMS part into the gallery (Pictures/Librelab). */
@@ -811,15 +837,21 @@ private fun MessageBubble(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("删除这条消息?") },
-            text = { Text("删除后不可恢复") },
+            title = { Text(stringResource(R.string.dialog_delete_single_title)) },
+            text = { Text(stringResource(R.string.dialog_delete_irreversible)) },
             confirmButton = {
                 TextButton({
                     confirmDelete = false
                     onDelete(message)
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) {
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                }
             },
-            dismissButton = { TextButton({ confirmDelete = false }) { Text("取消") } }
+            dismissButton = {
+                TextButton({ confirmDelete = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
         )
     }
 }
@@ -839,7 +871,7 @@ private fun MmsImage(
     Box {
         AsyncImage(
             model = uri,
-            contentDescription = "图片消息",
+            contentDescription = stringResource(R.string.image_message),
             modifier = Modifier
                 .padding(bottom = 6.dp)
                 .clip(RoundedCornerShape(8.dp))
@@ -945,7 +977,7 @@ private fun MessageActionMenu(
     ) {
         DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
             DropdownMenuItem(
-                text = { Text("多选") },
+                text = { Text(stringResource(R.string.action_multi_select)) },
                 onClick = {
                     onDismiss()
                     onStartMultiSelect()
@@ -953,16 +985,16 @@ private fun MessageActionMenu(
             )
             if (message.body.isNotBlank()) {
                 DropdownMenuItem(
-                    text = { Text("复制") },
+                    text = { Text(stringResource(R.string.action_copy)) },
                     onClick = {
                         clipboard.setText(AnnotatedString(message.body))
-                        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_copied, Toast.LENGTH_SHORT).show()
                         onDismiss()
                     }
                 )
             }
             DropdownMenuItem(
-                text = { Text("分享") },
+                text = { Text(stringResource(R.string.action_share)) },
                 onClick = {
                     shareMessage(context, message)
                     onDismiss()
@@ -970,7 +1002,7 @@ private fun MessageActionMenu(
             )
             if (hasImages) {
                 DropdownMenuItem(
-                    text = { Text("保存图片") },
+                    text = { Text(stringResource(R.string.action_save_image)) },
                     onClick = {
                         message.imageUris.firstOrNull()?.let(onSaveImage)
                         onDismiss()
@@ -978,7 +1010,9 @@ private fun MessageActionMenu(
                 )
             }
             DropdownMenuItem(
-                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                text = {
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                },
                 onClick = {
                     onDismiss()
                     onRequestDelete()
@@ -1039,20 +1073,24 @@ private fun MessageInputBar(
                 ) {
                     AsyncImage(
                         model = pendingImage,
-                        contentDescription = "待发送图片",
+                        contentDescription = stringResource(R.string.pending_image),
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(8.dp))
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text = "图片附件",
+                        text = stringResource(R.string.image_attachment),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = onRemoveImage) {
-                        Icon(MaterialSymbols.Outlined.Close, contentDescription = "移除图片", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(
+                            MaterialSymbols.Outlined.Close,
+                            contentDescription = stringResource(R.string.action_remove_image),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -1063,7 +1101,11 @@ private fun MessageInputBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onAttach) {
-                    Icon(MaterialSymbols.Outlined.Attach_file, contentDescription = "附件", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(
+                        MaterialSymbols.Outlined.Attach_file,
+                        contentDescription = stringResource(R.string.action_attach),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 // Pill-shaped input
@@ -1075,7 +1117,7 @@ private fun MessageInputBar(
                 ) {
                     if (value.isEmpty()) {
                         Text(
-                            text = "输入短信...",
+                            text = stringResource(R.string.placeholder_input_sms),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
@@ -1111,7 +1153,11 @@ private fun MessageInputBar(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Icon(MaterialSymbols.Outlined.Send, contentDescription = "发送", modifier = Modifier.size(22.dp))
+                    Icon(
+                        MaterialSymbols.Outlined.Send,
+                        contentDescription = stringResource(R.string.action_send),
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
             }
         }

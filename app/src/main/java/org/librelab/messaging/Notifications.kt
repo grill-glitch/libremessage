@@ -11,6 +11,7 @@ import android.os.Build
 import android.provider.Telephony
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import org.librelab.messaging.R
 import org.librelab.messaging.data.SmsParser
 
 /** Notification helpers for the incoming-SMS receiver. */

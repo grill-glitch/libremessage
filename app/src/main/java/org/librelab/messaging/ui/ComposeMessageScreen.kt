@@ -33,9 +33,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import org.librelab.messaging.R
 
 /** New-message screen: entry from the FAB or from an smsto: SENDTO intent. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,10 +57,10 @@ fun ComposeMessageScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("新短信", style = MaterialTheme.typography.titleMedium) },
+                title = { Text(stringResource(R.string.title_new_sms), style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(MaterialSymbols.Outlined.Arrow_back, contentDescription = "返回")
+                        Icon(MaterialSymbols.Outlined.Arrow_back, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -78,7 +80,7 @@ fun ComposeMessageScreen(
             OutlinedTextField(
                 value = number,
                 onValueChange = { number = it },
-                label = { Text("收件人") },
+                label = { Text(stringResource(R.string.recipient)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth()
@@ -86,35 +88,35 @@ fun ComposeMessageScreen(
             OutlinedTextField(
                 value = body,
                 onValueChange = { body = it },
-                label = { Text("短信内容") },
+                label = { Text(stringResource(R.string.sms_body)) },
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
             Button(
                 onClick = {
                     if (number.isBlank()) {
-                        Toast.makeText(context, "请输入收件人号码", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_enter_recipient, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) !=
                         PackageManager.PERMISSION_GRANTED
                     ) {
-                        Toast.makeText(context, "无发送短信权限", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_no_send_permission, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     sending = true
                     try {
                         SmsManager.getDefault().sendTextMessage(number, null, body, null, null)
-                        Toast.makeText(context, "短信已发送", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_sms_sent, Toast.LENGTH_SHORT).show()
                         onBack()
                     } catch (e: Exception) {
                         sending = false
-                        Toast.makeText(context, "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_send_failed, e.message), Toast.LENGTH_SHORT).show()
                     }
                 },
                 enabled = !sending,
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
-                Text(if (sending) "发送中…" else "发送")
+                Text(if (sending) stringResource(R.string.action_sending) else stringResource(R.string.action_send))
             }
         }
     }

@@ -14,6 +14,6 @@ class CopyCodeReceiver : BroadcastReceiver() {
         val code = intent.getStringExtra("code") ?: return
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("sms_code", code))
-        Toast.makeText(context, R.string.code_copied, Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.toast_code_copied, Toast.LENGTH_SHORT).show()
     }
 }

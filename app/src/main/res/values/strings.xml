@@ -1,10 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">短信</string>
-    <string name="notification_channel_sms">新短信通知</string>
-    <string name="copy_code">复制验证码</string>
-    <string name="code_copied">验证码已复制到剪贴板</string>
-    <string name="mms_title">收到一条彩信</string>
-    <string name="mms_body">当前版本暂不支持查看彩信,请使用其他应用</string>
-    <string name="default_app_unavailable">系统未提供默认短信设置入口,请到 设置 → 应用 → 默认应用 中手动修改</string>
+    <!-- App -->
+    <string name="app_name">LibreMessage</string>
+    <string name="tab_sms">Messages</string>
+    <string name="tab_contacts">Contacts</string>
+
+    <!-- Filters -->
+    <string name="filter_all">All</string>
+    <string name="filter_code">Codes</string>
+    <string name="filter_package">Parcels</string>
+    <string name="filter_ad">Ads</string>
+    <string name="filter_archived">Archived</string>
+
+    <!-- Titles / placeholders -->
+    <string name="title_new_sms">New message</string>
+    <string name="placeholder_search_sms">Search messages</string>
+    <string name="placeholder_input_sms">Type message…</string>
+    <string name="recipient">Recipient</string>
+    <string name="sms_body">Message</string>
+
+    <!-- Actions -->
+    <string name="action_delete">Delete</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_share">Share</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_send">Send</string>
+    <string name="action_sending">Sending…</string>
+    <string name="action_back">Back</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_search">Search</string>
+    <string name="action_close_search">Close search</string>
+    <string name="action_select_all">Select all</string>
+    <string name="action_deselect">Deselect</string>
+    <string name="action_cancel_selection">Cancel selection</string>
+    <string name="action_archive">Archive</string>
+    <string name="action_unarchive">Unarchive</string>
+    <string name="action_new_sms">New message</string>
+    <string name="action_more">More</string>
+    <string name="action_dial">Call</string>
+    <string name="action_multi_select">Multi-select</string>
+    <string name="action_save_image">Save image</string>
+    <string name="action_remove_image">Remove image</string>
+    <string name="action_attach">Attach</string>
+    <string name="action_grant">Grant</string>
+    <string name="action_go_settings">Open settings</string>
+    <string name="action_set_default_app">Set as default SMS app</string>
+    <string name="action_view_original">Original message</string>
+    <string name="action_copy_code">Copy code</string>
+    <string name="action_view_all_codes">View all codes</string>
+    <string name="action_selected">Selected</string>
+    <string name="selected_count">%1$d selected</string>
+
+    <!-- Smart card -->
+    <string name="code_verification">Verification code</string>
+    <string name="code_pickup">Pickup code</string>
+    <string name="smart_card_empty">No verification codes yet</string>
+    <string name="all_codes_title">All codes (%1$d)</string>
+    <string name="image_message">[Image] %1$s</string>
+    <string name="image">Image</string>
+    <string name="image_attachment">Image attachment</string>
+    <string name="pending_image">Pending image</string>
+
+    <!-- Empty states -->
+    <string name="empty_sms">No messages</string>
+    <string name="empty_codes">No verification codes</string>
+    <string name="empty_pickups">No pickup codes</string>
+    <string name="empty_contacts">No contacts</string>
+    <string name="empty_contact_match">No matching contacts</string>
+
+    <!-- Setup card -->
+    <string name="setup_permission_title">SMS permission required</string>
+    <string name="setup_permission_body">Grant access to read system messages and auto-extract codes</string>
+    <string name="setup_default_title">Not the default SMS app</string>
+    <string name="setup_default_body">Set as default to read the SMS database</string>
+
+    <!-- Settings -->
+    <string name="settings_default_app">Default SMS app</string>
+    <string name="settings_default_app_active">Already the system default SMS app</string>
+    <string name="settings_default_app_hint">This app can only read the system SMS database after being set as the default SMS app.</string>
+    <string name="settings_ads_in_all">Show ads in All tab</string>
+    <string name="settings_ads_in_all_hint">When off, ad messages only appear in the Ads tab</string>
+    <string name="settings_mute_ads">Mute ad notifications</string>
+    <string name="settings_mute_ads_hint">Ad messages are still saved to the list but no longer pop a notification</string>
+    <string name="settings_auto_copy">Auto-copy codes</string>
+    <string name="settings_auto_copy_hint">Automatically copy the code to the clipboard when a code message arrives</string>
+
+    <!-- Toasts -->
+    <string name="toast_code_copied">Code copied to clipboard</string>
+    <string name="toast_copied">Copied</string>
+    <string name="toast_copied_count">%1$d messages copied</string>
+    <string name="toast_saved_to_gallery">Saved to gallery</string>
+    <string name="toast_save_failed">Save failed</string>
+    <string name="toast_sms_sent">Message sent</string>
+    <string name="toast_send_failed">Send failed: %1$s</string>
+    <string name="toast_mms_failed">MMS send failed</string>
+    <string name="toast_mms_data_required">MMS send failed: allow MMS data connection and retry</string>
+    <string name="toast_enter_recipient">Enter a recipient number first</string>
+    <string name="toast_no_send_permission">No permission to send SMS</string>
+    <string name="toast_delete_failed">Delete failed</string>
+    <string name="toast_more_wip">More features coming soon</string>
+    <string name="toast_read_image_failed">Failed to read image</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_delete_thread_title">Delete conversation?</string>
+    <string name="dialog_delete_thread_body">Delete %1$d conversations? This cannot be undone.</string>
+    <string name="dialog_delete_message_title">Delete message</string>
+    <string name="dialog_delete_message_body">Delete %1$d messages? This cannot be undone.</string>
+    <string name="dialog_delete_single_title">Delete this message?</string>
+    <string name="dialog_delete_irreversible">This cannot be undone</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_sms">New SMS notifications</string>
+    <string name="copy_code">Copy code</string>
+    <string name="mms_title">Received a multimedia message</string>
+    <string name="mms_body">MMS content is not supported yet — use another app to view it</string>
+    <string name="unknown_sender">Unknown number</string>
+
+    <!-- Time (formatted with the app's own units to stay short) -->
+    <string name="time_just_now">Just now</string>
+    <string name="time_minutes_ago">%1$d min ago</string>
+    <string name="time_yesterday">Yesterday</string>
+    <string name="date_format_month_day">MMM d</string>
+    <string name="date_format_year_month_day">yyyy/M/d</string>
+
+    <!-- Misc -->
+    <string name="me">Me</string>
+    <string name="default_app_unavailable">No system default-SMS-app settings entry found. Change it manually in Settings → Apps → Default apps</string>
+    <string name="share_chooser_title">Share</string>
 </resources>

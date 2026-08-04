@@ -29,11 +29,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.outlined.Check_circle
 import com.composables.icons.materialsymbols.outlined.Package_2
 import com.composables.icons.materialsymbols.outlined.Safety_check
+import org.librelab.messaging.R
 import org.librelab.messaging.data.MessageCategory
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsThreadItem
@@ -53,6 +56,7 @@ fun MessageItem(
     selected: Boolean = false
 ) {
     val message = thread.message
+    val context = LocalContext.current
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -69,7 +73,7 @@ fun MessageItem(
         if (selected) {
             Icon(
                 imageVector = MaterialSymbols.Outlined.Check_circle,
-                contentDescription = "已选择",
+                contentDescription = stringResource(R.string.action_selected),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp)
             )
@@ -89,7 +93,7 @@ fun MessageItem(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = if (message.imageUris.isNotEmpty()) {
-                    "[图片] ${message.body.trim()}".trimEnd()
+                    stringResource(R.string.image_message, message.body.trim()).trimEnd()
                 } else {
                     message.body
                 },
@@ -107,7 +111,7 @@ fun MessageItem(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = formatRelativeTime(message.date),
+                text = formatRelativeTime(context, message.date),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -148,7 +152,7 @@ fun Avatar(message: SmsMessage, modifier: Modifier = Modifier) {
     // Code messages adapt like the smart card: verified_user for 验证码,
     // package (box) for 取件码; other categories keep their own icon.
     val icon: ImageVector = if (message.category == MessageCategory.CODE) {
-        if (message.codeLabel == "取件码") MaterialSymbols.Outlined.Package_2 else MaterialSymbols.Outlined.Safety_check
+        if (message.isPickupCode) MaterialSymbols.Outlined.Package_2 else MaterialSymbols.Outlined.Safety_check
     } else {
         message.category.icon
     }

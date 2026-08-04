@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.librelab.messaging.data.SmsFilter
 
@@ -42,7 +43,7 @@ fun FilterChipRow(
             FilterChip(
                 selected = isSelected,
                 onClick = { onSelect(filter) },
-                label = { Text(filter.label) },
+                label = { Text(stringResource(filter.labelRes)) },
                 leadingIcon = {
                     Icon(
                         imageVector = iconFor(filter),

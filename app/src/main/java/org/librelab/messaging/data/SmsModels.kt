@@ -1,6 +1,7 @@
 package org.librelab.messaging.data
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Account_balance
@@ -10,6 +11,7 @@ import com.composables.icons.materialsymbols.outlined.Favorite
 import com.composables.icons.materialsymbols.outlined.Notifications
 import com.composables.icons.materialsymbols.outlined.Person
 import com.composables.icons.materialsymbols.outlined.Shield
+import org.librelab.messaging.R
 
 /** Category assigned by [SmsParser] to every real message. */
 enum class MessageCategory {
@@ -42,12 +44,12 @@ enum class MessageCategory {
 }
 
 /** Filter chips on the main screen. */
-enum class SmsFilter(val label: String) {
-    ALL("全部"),
-    CODE("验证码"),
-    PACKAGE("包裹"),
-    AD("广告"),
-    ARCHIVED("归档");
+enum class SmsFilter(@StringRes val labelRes: Int) {
+    ALL(R.string.filter_all),
+    CODE(R.string.filter_code),
+    PACKAGE(R.string.filter_package),
+    AD(R.string.filter_ad),
+    ARCHIVED(R.string.filter_archived);
 
     fun matches(category: MessageCategory, body: String = ""): Boolean = when (this) {
         ALL -> category != MessageCategory.ARCHIVED
@@ -87,8 +89,8 @@ data class SmsMessage(
     /** Smart card title: merchant name from the 【...】 bracket, else sender. */
     val merchantName: String get() = SmsParser.merchantName(body, sender)
 
-    /** Smart card subtitle: "验证码" or "取件码" auto-detected from the body. */
-    val codeLabel: String get() = SmsParser.codeLabel(body)
+    /** Smart card subtitle: pickup code for express messages, else verification code. */
+    val isPickupCode: Boolean get() = SmsParser.isPickupCode(body)
 }
 
 /** Contact lookup result from ContactsContract. */

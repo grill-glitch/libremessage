@@ -239,7 +239,7 @@ internal fun CodeCardRow(
         Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 170.dp)
+                .heightIn(min = 120.dp)
         ) {
             // Main content, bottom padding leaves room for the footer bar.
             Row(

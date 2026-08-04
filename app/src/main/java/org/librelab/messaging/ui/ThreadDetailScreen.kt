@@ -17,12 +17,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -58,10 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,31 +121,31 @@ fun ThreadDetailScreen(
 
     BackHandler(onBack = onBack)
 
-    // Auto-scroll to the newest message on open and on new messages.
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.scrollToItem(messages.size - 1)
-    }
+    // reverseLayout: index 0 (newest) renders at the bottom, right above the
+    // input bar; the default position already shows the newest messages, so
+    // no scroll is needed on open or when new messages arrive.
 
-    // When the user starts typing, jump to the newest message ONLY if they
-    // were already at the bottom (scrolling up to read history must keep
-    // its place — no yanking back to the newest message).
+    // When the user starts typing, keep the newest message at the bottom —
+    // but ONLY if they were already there (scrolling up to read history must
+    // keep its place — no yanking back to the newest message).
     var inputFocused by remember { mutableStateOf(false) }
     LaunchedEffect(inputFocused) {
         if (inputFocused && messages.isNotEmpty()) {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-            if (lastVisible >= messages.size - 1) {
-                listState.scrollToItem(messages.size - 1)
+            val firstVisible = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: -1
+            if (firstVisible == 0) {
+                listState.scrollToItem(0)
             }
         }
     }
 
-    // IME lift: the message list and the input bar move together, translated
-    // by the keyboard height — instantaneous, no animation.
-    val density = LocalDensity.current
-    val imeOffset = WindowInsets.ime.getBottom(density)
-
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        // imePadding: input bar AND message list move together with the
+        // keyboard (the list's layout height shrinks in sync). reverseLayout
+        // parks the newest message right above the input bar; the whole
+        // conversation (including old history) stays browsable.
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding(),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
@@ -199,17 +194,11 @@ fun ThreadDetailScreen(
             )
         },
         bottomBar = {
-            // The input bar rides the keyboard: lifted by the IME offset.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .offset { IntOffset(0, -imeOffset) }
-            ) {
-                MessageInputBar(
-                    value = input,
-                    onValueChange = { input = it },
-                    onFocusChanged = { inputFocused = it },
-                    pendingImage = pendingImage,
+            MessageInputBar(
+                value = input,
+                onValueChange = { input = it },
+                onFocusChanged = { inputFocused = it },
+                pendingImage = pendingImage,
                 onAttach = { imagePicker.launch("image/*") },
                 onRemoveImage = { pendingImage = null },
                 onSend = {
@@ -285,27 +274,22 @@ fun ThreadDetailScreen(
                         Toast.makeText(context, "彩信发送失败", Toast.LENGTH_SHORT).show()
                     }
                 }
-                )
-            }
+            )
         }
     ) { padding ->
-        // The message list rides with the input bar: same IME offset.
-        Box(
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .offset { IntOffset(0, -imeOffset) }
+                .padding(padding),
+            // Newest message hugs the input bar: reversed data +
+            // reverseLayout (index 0 = newest, rendered at the bottom).
+            reverseLayout = true,
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(messages, key = { it.id }) { message ->
-                    MessageBubble(message = message, myInitial = "我")
-                }
+            items(messages.asReversed(), key = { it.id }) { message ->
+                MessageBubble(message = message, myInitial = "我")
             }
         }
     }

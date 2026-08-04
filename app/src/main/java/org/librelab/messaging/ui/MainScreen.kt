@@ -1,6 +1,7 @@
 package org.librelab.messaging.ui
 
 import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Arrow_back
 import com.composables.icons.materialsymbols.outlined.Chat
 import com.composables.icons.materialsymbols.outlined.Close
 import com.composables.icons.materialsymbols.outlined.Edit
@@ -183,6 +184,16 @@ fun MainScreen(
         return
     }
 
+    // Full-screen settings page.
+    if (state.showSettings) {
+        SettingsScreen(
+            isDefaultSmsApp = state.isDefaultSmsApp,
+            onSetDefaultApp = onSetDefaultApp,
+            onBack = { vm.setShowSettings(false) }
+        )
+        return
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -304,14 +315,6 @@ fun MainScreen(
                     .fillMaxSize()
             )
         }
-    }
-
-    if (state.showSettings) {
-        SettingsDialog(
-            isDefaultSmsApp = state.isDefaultSmsApp,
-            onSetDefaultApp = onSetDefaultApp,
-            onDismiss = { vm.setShowSettings(false) }
-        )
     }
 }
 
@@ -453,38 +456,63 @@ private fun SetupCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsDialog(
+private fun SettingsScreen(
     isDefaultSmsApp: Boolean,
     onSetDefaultApp: () -> Unit,
-    onDismiss: () -> Unit
+    onBack: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("设置") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (isDefaultSmsApp) {
-                    Text(
-                        text = "当前已是系统默认短信应用",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(
-                        text = "设为默认短信应用后，本应用才能读取系统短信数据库。",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    OutlinedButton(onClick = onSetDefaultApp) {
-                        Text("设为默认短信应用")
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text("设置") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MaterialSymbols.Outlined.Arrow_back,
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "默认短信应用",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            if (isDefaultSmsApp) {
+                Text(
+                    text = "当前已是系统默认短信应用",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = "设为默认短信应用后，本应用才能读取系统短信数据库。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                OutlinedButton(onClick = onSetDefaultApp) {
+                    Text("设为默认短信应用")
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
         }
-    )
+    }
 }
 
 /**

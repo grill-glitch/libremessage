@@ -131,13 +131,16 @@ fun ThreadDetailScreen(
         if (messages.isNotEmpty()) listState.scrollToItem(messages.size - 1)
     }
 
-    // When the user starts typing (input focused), jump to the newest
-    // message once. After that the list scrolls freely (history browsing
-    // must not be yanked back by IME insets flapping).
+    // When the user starts typing, jump to the newest message ONLY if they
+    // were already at the bottom (scrolling up to read history must keep
+    // its place — no yanking back to the newest message).
     var inputFocused by remember { mutableStateOf(false) }
     LaunchedEffect(inputFocused) {
         if (inputFocused && messages.isNotEmpty()) {
-            listState.scrollToItem(messages.size - 1)
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            if (lastVisible >= messages.size - 1) {
+                listState.scrollToItem(messages.size - 1)
+            }
         }
     }
 

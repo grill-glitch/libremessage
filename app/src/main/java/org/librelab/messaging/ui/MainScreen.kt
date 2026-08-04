@@ -351,13 +351,26 @@ private fun SmsListContent(
             }
         }
 
-        item {
-            SmartCodeCard(
-                message = state.latestCode,
-                allCodes = state.allCodeEntries,
-                onCopy = onCopyCode,
-                onOpenOriginal = onOpenOriginal
-            )
+        when (state.filter) {
+            SmsFilter.ALL, SmsFilter.CODE -> item {
+                SmartCodeCard(
+                    message = state.latestCode,
+                    allCodes = state.allCodeEntries,
+                    onCopy = onCopyCode,
+                    onOpenOriginal = onOpenOriginal
+                )
+            }
+            SmsFilter.PACKAGE -> item {
+                SmartCodeCard(
+                    message = state.latestPickup,
+                    allCodes = state.allPickups,
+                    onCopy = onCopyCode,
+                    onOpenOriginal = onOpenOriginal,
+                    fallbackLabel = "取件码",
+                    emptyText = "暂无取件码短信"
+                )
+            }
+            else -> {}
         }
         item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
 

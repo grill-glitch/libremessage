@@ -47,10 +47,13 @@ enum class SmsFilter(val label: String) {
     AD("广告"),
     ARCHIVED("归档");
 
-    fun matches(category: MessageCategory): Boolean = when (this) {
+    fun matches(category: MessageCategory, body: String = ""): Boolean = when (this) {
         ALL -> category != MessageCategory.ARCHIVED
         CODE -> category == MessageCategory.CODE
-        PACKAGE -> category == MessageCategory.ECOMMERCE
+        // Express pickup SMS are CODE (取件码) — also surface them here so the
+        // 包裹 filter shows real conversations, not just the banner.
+        PACKAGE -> category == MessageCategory.ECOMMERCE ||
+            (category == MessageCategory.CODE && SmsParser.codeLabel(body) == "取件码")
         AD -> category == MessageCategory.AD
         ARCHIVED -> category == MessageCategory.ARCHIVED
     }

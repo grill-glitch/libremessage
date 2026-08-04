@@ -35,6 +35,18 @@ data class UiState(
     val latestCode: SmsMessage?
         get() = allCodeEntries.maxByOrNull { it.date }
 
+    /** Latest express pickup message (used under the 包裹 filter). */
+    val latestPickup: SmsMessage?
+        get() = allPickups.maxByOrNull { it.date }
+
+    /** Express pickup entries (one per cabinet number), for the 包裹 banner. */
+    val allPickups: List<SmsMessage>
+        get() = pickupMessages
+            .flatMap { msg ->
+                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
+            }
+            .sortedByDescending { it.date }
+
     /** All code + express messages for the expanded list. Express messages
      * are split per cabinet number: 【多多代收点】…取货码1-3-9448、5-4-3216
      * yields two entries (one per parcel). */
@@ -45,12 +57,22 @@ data class UiState(
             }
             .sortedByDescending { it.date }
 
+    private val codeMessages: List<SmsMessage>
+        get() = messages.filter {
+            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "验证码"
+        }
+
+    private val pickupMessages: List<SmsMessage>
+        get() = messages.filter {
+            it.category == MessageCategory.CODE && SmsParser.codeLabel(it.body) == "取件码"
+        }
+
     /** Messages after applying filter chip + search query. */
     val visibleMessages: List<SmsMessage>
         get() {
             val q = searchQuery.trim()
             return messages.filter { m ->
-                filter.matches(m.category) &&
+                filter.matches(m.category, m.body) &&
                     (q.isEmpty() || m.body.contains(q, ignoreCase = true) || m.address.contains(q, ignoreCase = true))
             }
         }

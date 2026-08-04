@@ -40,6 +40,7 @@ import org.librelab.messaging.R
 import org.librelab.messaging.data.MessageCategory
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsThreadItem
+import org.librelab.messaging.ui.theme.avatarColorFor
 import org.librelab.messaging.util.formatRelativeTime
 
 /**
@@ -135,20 +136,12 @@ fun MessageItem(
     }
 }
 
-/** 48dp circular avatar: primaryContainer for known contacts, secondaryContainer otherwise. */
+/** 48dp circular avatar: deterministic palette color derived from the
+ * contact name (or the address when unnamed), so every sender keeps a
+ * stable, distinct color (see theme/Color.kt). */
 @Composable
 fun Avatar(message: SmsMessage, modifier: Modifier = Modifier) {
-    val isContact = message.contactName != null
-    val container = if (isContact) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.secondaryContainer
-    }
-    val content = if (isContact) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    }
+    val avatarColor = avatarColorFor(message.contactName ?: message.address)
     // Code messages adapt like the smart card: verified_user for 验证码,
     // package (box) for 取件码; other categories keep their own icon.
     val icon: ImageVector = if (message.category == MessageCategory.CODE) {
@@ -160,13 +153,13 @@ fun Avatar(message: SmsMessage, modifier: Modifier = Modifier) {
         modifier = modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(container),
+            .background(avatarColor.container),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = content,
+            tint = avatarColor.content,
             modifier = Modifier.size(22.dp)
         )
     }

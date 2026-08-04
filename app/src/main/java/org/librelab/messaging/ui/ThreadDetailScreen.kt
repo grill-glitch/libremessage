@@ -118,6 +118,8 @@ import org.librelab.messaging.data.ContactInfo
 import org.librelab.messaging.data.SendStatus
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsViewModel
+import org.librelab.messaging.ui.theme.AvatarColor
+import org.librelab.messaging.ui.theme.avatarColorFor
 import org.librelab.messaging.util.MmsSender
 import org.librelab.messaging.util.OutboxStore
 import kotlinx.coroutines.Dispatchers
@@ -267,12 +269,13 @@ fun ThreadDetailScreen(
                         )
                     } else {
                         val titleText = if (isNewThread) newNumber else sender
+                        val ac = avatarColorFor(titleText)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             InitialAvatar(
                                 initial = titleText.firstOrNull()?.toString() ?: "?",
                                 size = 36,
-                                container = MaterialTheme.colorScheme.primaryContainer,
-                                content = MaterialTheme.colorScheme.onPrimaryContainer
+                                container = ac.container,
+                                content = ac.content
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
@@ -872,6 +875,7 @@ private fun MessageBubble(
         }
     } else {
         // Received — left aligned; images outside the bubble
+        val avatarColor = avatarColorFor(message.contactName ?: message.address)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start,
@@ -880,8 +884,8 @@ private fun MessageBubble(
             InitialAvatar(
                 initial = message.sender.firstOrNull()?.toString() ?: "?",
                 size = 32,
-                container = MaterialTheme.colorScheme.tertiaryContainer,
-                content = MaterialTheme.colorScheme.onTertiaryContainer
+                container = avatarColor.container,
+                content = avatarColor.content
             )
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.Start) {

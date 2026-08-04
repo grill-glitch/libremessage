@@ -37,6 +37,9 @@
     <string name="action_unarchive">取消归档</string>
     <string name="action_new_sms">新建短信</string>
     <string name="action_more">更多</string>
+    <string name="action_add_contact">添加到通讯录</string>
+    <string name="action_block_number">屏蔽号码</string>
+    <string name="block_number_unavailable">此设备不支持屏蔽该号码</string>
     <string name="action_dial">拨号</string>
     <string name="action_multi_select">多选</string>
     <string name="action_save_image">保存图片</string>
@@ -99,6 +102,7 @@
     <string name="toast_no_send_permission">无发送短信权限</string>
     <string name="toast_delete_failed">删除失败</string>
     <string name="toast_more_wip">更多功能开发中</string>
+    <string name="toast_no_contact_app">未找到通讯录应用</string>
     <string name="toast_read_image_failed">读取图片失败</string>
 
     <!-- Dialogs -->

@@ -9,6 +9,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.BlockedNumberContract
+import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.telephony.SmsManager
 import android.widget.Toast
@@ -179,6 +181,8 @@ fun ThreadDetailScreen(
     var multiSelect by remember { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf(setOf<String>()) }
     var confirmBatchDelete by remember { mutableStateOf(false) }
+    // Top-bar "more" overflow menu.
+    var moreMenuOpen by remember { mutableStateOf(false) }
     val selectedMessages = messages.filter { it.key in selectedKeys }
     val allMessageKeys = messages.map { it.key }
     val allSelected = allMessageKeys.isNotEmpty() && selectedKeys.containsAll(allMessageKeys)
@@ -370,14 +374,40 @@ fun ThreadDetailScreen(
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        IconButton(onClick = {
-                            Toast.makeText(context, R.string.toast_more_wip, Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(
-                                MaterialSymbols.Outlined.More_vert,
-                                contentDescription = stringResource(R.string.action_more),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        Box {
+                            IconButton(onClick = { moreMenuOpen = true }) {
+                                Icon(
+                                    MaterialSymbols.Outlined.More_vert,
+                                    contentDescription = stringResource(R.string.action_more),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = moreMenuOpen,
+                                onDismissRequest = { moreMenuOpen = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_add_contact)) },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        val dial = if (isNewThread) newNumber else address
+                                        if (dial.isNotBlank()) addToContacts(context, dial)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.action_block_number),
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        val dial = if (isNewThread) newNumber else address
+                                        if (dial.isNotBlank()) blockNumber(context, dial)
+                                    }
+                                )
+                            }
                         }
                     }
                 },
@@ -676,6 +706,49 @@ private fun shareText(context: Context, text: String) {
         putExtra(Intent.EXTRA_TEXT, text)
     }
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_chooser_title)))
+}
+
+/**
+ * Open the system contact editor pre-filled with this number, so the user
+ * can save the sender as a contact (or add the number to an existing one).
+ */
+private fun addToContacts(context: Context, number: String) {
+    val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+        type = ContactsContract.RawContacts.CONTENT_TYPE
+        putExtra(ContactsContract.Intents.Insert.PHONE, number)
+        putExtra(
+            ContactsContract.Intents.Insert.PHONE_TYPE,
+            ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE
+        )
+    }
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            Toast.makeText(context, R.string.toast_no_contact_app, Toast.LENGTH_SHORT).show()
+        }
+}
+
+/**
+ * Block a number. There is no public API to write the system block list
+ * (insertBlockedNumber is @SystemApi behind a signature permission), so we
+ * open the platform blocked-numbers settings — the same flow third-party
+ * SMS apps (QKSMS, Simple SMS…) use. ACTION_BLOCKED_NUMBERS_SETTINGS is a
+ * hidden constant; its stable action string is used directly.
+ */
+private fun blockNumber(context: Context, number: String) {
+    val canBlock = runCatching {
+        BlockedNumberContract.canCurrentUserBlockNumbers(context)
+    }.getOrDefault(false)
+    if (!canBlock) {
+        Toast.makeText(context, R.string.block_number_unavailable, Toast.LENGTH_SHORT).show()
+        return
+    }
+    val settingsIntent = Intent("android.settings.BLOCKED_NUMBER_LIST").apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(settingsIntent) }
+        .onFailure {
+            Toast.makeText(context, R.string.block_number_unavailable, Toast.LENGTH_SHORT).show()
+        }
 }
 
 /** Copy an MMS part into the gallery (Pictures/Librelab). */

@@ -37,6 +37,9 @@
     <string name="action_unarchive">Unarchive</string>
     <string name="action_new_sms">New message</string>
     <string name="action_more">More</string>
+    <string name="action_add_contact">Add to contacts</string>
+    <string name="action_block_number">Block number</string>
+    <string name="block_number_unavailable">This number cannot be blocked on this device</string>
     <string name="action_dial">Call</string>
     <string name="action_multi_select">Multi-select</string>
     <string name="action_save_image">Save image</string>
@@ -99,6 +102,7 @@
     <string name="toast_no_send_permission">No permission to send SMS</string>
     <string name="toast_delete_failed">Delete failed</string>
     <string name="toast_more_wip">More features coming soon</string>
+    <string name="toast_no_contact_app">No contacts app found</string>
     <string name="toast_read_image_failed">Failed to read image</string>
 
     <!-- Dialogs -->

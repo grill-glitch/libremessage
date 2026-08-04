@@ -133,16 +133,17 @@ fun MainScreen(
         navController = navController,
         startDestination = "home",
         modifier = Modifier.fillMaxSize(),
-        // Predictable push/pop transitions: a new page slides in from the
-        // right; back pops it out to the right.
+        // Predictable push/pop transitions (full-width slide, matching the
+        // platform default look): a new page slides in from the right while
+        // the current one slides out to the left; back reverses both.
         enterTransition = {
             slideInHorizontally(animationSpec = tween(300)) { it } + fadeIn(animationSpec = tween(300))
         },
         exitTransition = {
-            slideOutHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeOut(animationSpec = tween(300))
+            slideOutHorizontally(animationSpec = tween(300)) { -it } + fadeOut(animationSpec = tween(300))
         },
         popEnterTransition = {
-            slideInHorizontally(animationSpec = tween(300)) { -it / 3 } + fadeIn(animationSpec = tween(300))
+            slideInHorizontally(animationSpec = tween(300)) { -it } + fadeIn(animationSpec = tween(300))
         },
         popExitTransition = {
             slideOutHorizontally(animationSpec = tween(300)) { it } + fadeOut(animationSpec = tween(300))

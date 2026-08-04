@@ -62,9 +62,27 @@ class SmsRepository(private val context: Context) {
 
     fun setShowAdsInAll(show: Boolean) {
         context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("show_ads_in_all", show)
-            .apply()
+            .edit().putBoolean("show_ads_in_all", show).apply()
+    }
+
+    /** Whether ad-message notifications are muted (default: muted). */
+    fun notifyAds(): Boolean =
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .getBoolean("notify_ads", false)
+
+    fun setNotifyAds(notify: Boolean) {
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("notify_ads", notify).apply()
+    }
+
+    /** Whether incoming code messages auto-copy the code to the clipboard. */
+    fun autoCopyCode(): Boolean =
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .getBoolean("auto_copy_code", true)
+
+    fun setAutoCopyCode(auto: Boolean) {
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("auto_copy_code", auto).apply()
     }
 
     /** Permanently delete a conversation (all its sms + mms rows). */

@@ -30,7 +30,9 @@ data class UiState(
     val selectedThreadId: Long? = null,
     val threadMessages: List<SmsMessage> = emptyList(),
     val loading: Boolean = true,
-    val showAdsInAll: Boolean = false
+    val showAdsInAll: Boolean = false,
+    val notifyAds: Boolean = false,
+    val autoCopyCode: Boolean = true
 ) {
     /** Latest code/express message pinned to the smart banner. */
     val latestCode: SmsMessage?
@@ -127,7 +129,9 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 hasSmsPermission = hasSms,
                 isDefaultSmsApp = isDefault,
-                showAdsInAll = repository.showAdsInAll()
+                showAdsInAll = repository.showAdsInAll(),
+                notifyAds = repository.notifyAds(),
+                autoCopyCode = repository.autoCopyCode()
             )
         }
         if (!hasSms) {
@@ -212,6 +216,18 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     fun setShowAdsInAll(show: Boolean) {
         repository.setShowAdsInAll(show)
         _state.update { it.copy(showAdsInAll = show) }
+    }
+
+    /** 广告短信是否弹通知(设置项;默认静音)。 */
+    fun setNotifyAds(notify: Boolean) {
+        repository.setNotifyAds(notify)
+        _state.update { it.copy(notifyAds = notify) }
+    }
+
+    /** 验证码短信自动复制到剪贴板(设置项)。 */
+    fun setAutoCopyCode(auto: Boolean) {
+        repository.setAutoCopyCode(auto)
+        _state.update { it.copy(autoCopyCode = auto) }
     }
 
     fun setTab(tab: Int) {

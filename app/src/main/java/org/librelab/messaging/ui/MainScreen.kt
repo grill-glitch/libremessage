@@ -205,8 +205,12 @@ fun MainScreen(
             SettingsScreen(
                 isDefaultSmsApp = s.isDefaultSmsApp,
                 showAdsInAll = s.showAdsInAll,
+                notifyAds = s.notifyAds,
+                autoCopyCode = s.autoCopyCode,
                 onSetDefaultApp = rememberSetDefaultApp(vm),
                 onToggleAdsInAll = { vm.setShowAdsInAll(it) },
+                onToggleNotifyAds = { vm.setNotifyAds(it) },
+                onToggleAutoCopyCode = { vm.setAutoCopyCode(it) },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -667,8 +671,12 @@ private fun SetupCard(
 private fun SettingsScreen(
     isDefaultSmsApp: Boolean,
     showAdsInAll: Boolean,
+    notifyAds: Boolean,
+    autoCopyCode: Boolean,
     onSetDefaultApp: () -> Unit,
     onToggleAdsInAll: (Boolean) -> Unit,
+    onToggleNotifyAds: (Boolean) -> Unit,
+    onToggleAutoCopyCode: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -742,6 +750,56 @@ private fun SettingsScreen(
                 Switch(
                     checked = showAdsInAll,
                     onCheckedChange = onToggleAdsInAll
+                )
+            }
+
+            HorizontalDivider()
+
+            // 广告短信静音
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "广告短信静音",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "广告短信仍会保存到短信列表，但不再弹出系统通知",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = !notifyAds,
+                    onCheckedChange = { onToggleNotifyAds(!it) }
+                )
+            }
+
+            HorizontalDivider()
+
+            // 验证码自动复制
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "验证码自动复制",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "收到验证码短信时，自动把验证码复制到剪贴板",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = autoCopyCode,
+                    onCheckedChange = onToggleAutoCopyCode
                 )
             }
         }

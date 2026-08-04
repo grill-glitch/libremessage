@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import org.librelab.messaging.data.MessageCategory
+import org.librelab.messaging.data.SmsParser
 
 /**
  * Receives incoming SMS. SMS_RECEIVED is broadcast to every receiver (used
@@ -33,7 +35,28 @@ class SmsReceiver : BroadcastReceiver() {
         if (action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
             insertInbox(context, sms)
         }
-        Notifications.notifyIncoming(context, address, body)
+
+        val prefs = context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+        val category = SmsParser.classify(body, hasContact = false, archived = false)
+
+        // Setting: 广告短信静音 (ad messages never pop a notification).
+        val adMuted = category == MessageCategory.AD && !prefs.getBoolean("notify_ads", false)
+        if (!adMuted) {
+            Notifications.notifyIncoming(context, address, body)
+        }
+
+        // Setting: 验证码自动复制 (copy the code to the clipboard silently).
+        if (category == MessageCategory.CODE && prefs.getBoolean("auto_copy_code", true)) {
+            SmsParser.extractCode(body)?.let { code ->
+                try {
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                        as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("code", code))
+                } catch (e: Exception) {
+                    Log.e("SmsReceiver", "clipboard copy failed", e)
+                }
+            }
+        }
     }
 
     private fun insertInbox(context: Context, sms: android.telephony.SmsMessage) {

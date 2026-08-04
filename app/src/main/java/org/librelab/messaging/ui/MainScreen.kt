@@ -62,6 +62,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -104,6 +106,12 @@ fun MainScreen(
         )
     }
     var selectedThread by remember { mutableStateOf<SmsThreadItem?>(null) }
+    val searchFocus = remember { FocusRequester() }
+
+    // Entering search mode: focus the search field so the keyboard pops up.
+    LaunchedEffect(state.searchActive) {
+        if (state.searchActive) searchFocus.requestFocus()
+    }
 
     // Refresh whenever the app resumes (permissions / default-app may have changed).
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -191,12 +199,14 @@ fun MainScreen(
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent
                             ),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocus)
                         )
                     } else {
                         Text(
                             text = "短信",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                     }

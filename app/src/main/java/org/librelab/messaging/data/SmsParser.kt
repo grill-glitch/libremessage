@@ -10,7 +10,8 @@ object SmsParser {
     private val CODE_PATTERN = Regex("(?<!\\d)\\d{4,8}(?!\\d)")
 
     // Express pickup code: 【韵达快递】凭15-2-1300到采荷百合路11号驿站取运单尾号1300包裹
-    private val EXPRESS_CODE_PATTERN = Regex("凭\\s*([\\d]+-[\\d]+-[\\d]+)")
+    // 【多多代收点】您有2个包裹在采荷百合路11号驿站,取货码1-3-9448、5-4-3216
+    private val EXPRESS_CODE_PATTERN = Regex("(?:凭|取货码)\\s*([\\d]+-[\\d]+-[\\d]+)")
 
     /** 【商户名】 bracket for extracting the merchant name. */
     private val BRACKET_PATTERN = Regex("【([^】]+)】")
@@ -46,9 +47,9 @@ object SmsParser {
      */
     fun extractCode(body: String): String? {
         val text = body.replace(" ", "")
-        // Express pickup messages carry the cabinet number as 凭X-X-XXXX and
-        // say 驿站/取件 — the literal "取件码" never appears in them.
-        if (text.contains("驿站") || text.contains("取运单")) {
+        // Express pickup messages carry the cabinet number as 凭X-X-XXXX or
+        // 取货码X-X-XXXX and say 驿站/取件 — the literal "取件码" never appears.
+        if (text.contains("驿站") || text.contains("取运单") || text.contains("取货码")) {
             EXPRESS_CODE_PATTERN.find(body)?.let { return it.groupValues[1] }
         }
         if (CODE_KEYWORDS.none { text.contains(it) }) return null
@@ -76,7 +77,7 @@ object SmsParser {
 
     /** Smart card subtitle: "取件码" for express messages, else "验证码". */
     fun codeLabel(body: String): String =
-        if (body.contains("取件码") ||
+        if (body.contains("取件码") || body.contains("取货码") ||
             (body.contains("驿站") && EXPRESS_CODE_PATTERN.containsMatchIn(body))
         ) "取件码" else "验证码"
 

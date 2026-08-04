@@ -142,6 +142,14 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeThread() = _state.update { it.copy(selectedThreadId = null, threadMessages = emptyList()) }
 
+    /** Archive (or restore) a conversation; the system archived view updates. */
+    fun archiveThread(threadId: Long, archive: Boolean) {
+        viewModelScope.launch {
+            repository.archiveThread(threadId, archive)
+            refresh()
+        }
+    }
+
     fun loadThread(threadId: Long) {
         viewModelScope.launch {
             val thread = repository.queryThread(threadId)

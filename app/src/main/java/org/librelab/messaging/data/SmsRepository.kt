@@ -29,6 +29,32 @@ class SmsRepository(private val context: Context) {
     /** content://mms root for the MMS pdu table. */
     private val mmsUri: Uri = Uri.parse("content://mms")
 
+    /**
+     * Archive (or restore) one thread. The sms table has no `archived`
+     * column on this ROM, so we keep the archived thread ids locally and
+     * re-classify them as ARCHIVED on load.
+     */
+    suspend fun archiveThread(threadId: Long, archive: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val ids = archivedIds().toMutableSet()
+        if (archive) ids.add(threadId) else ids.remove(threadId)
+        setArchivedIds(ids)
+        true
+    }
+
+    private fun archivedIds(): Set<Long> =
+        context.getSharedPreferences("archive_prefs", Context.MODE_PRIVATE)
+            .getStringSet("thread_ids", emptySet())
+            ?.mapNotNull { it.toLongOrNull() }
+            ?.toSet()
+            ?: emptySet()
+
+    private fun setArchivedIds(ids: Set<Long>) {
+        context.getSharedPreferences("archive_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet("thread_ids", ids.map { it.toString() }.toSet())
+            .apply()
+    }
+
     suspend fun loadAll(): List<SmsMessage> = withContext(Dispatchers.IO) {
         val inbox = query(
             uri = Telephony.Sms.Inbox.CONTENT_URI,
@@ -36,19 +62,24 @@ class SmsRepository(private val context: Context) {
             selectionArgs = null,
             sortOrder = "${Telephony.Sms.DATE} DESC"
         )
-        val archived = if (Build.VERSION.SDK_INT >= 34) {
-            query(uri = archivedUri, selection = null, selectionArgs = null, sortOrder = "${Telephony.Sms.DATE} DESC")
-        } else emptyList()
         val mms = queryMms(selection = null, selectionArgs = null, sortOrder = "date DESC")
         val outbox = outboxMessages()
-        // Deduplicate by unique key (archived view overlaps the inbox view;
-        // sms and mms ids may overlap so keys carry a type prefix).
+        // Deduplicate by unique key (sms and mms ids may overlap so keys
+        // carry a type prefix).
         val byId = LinkedHashMap<String, SmsMessage>()
         inbox.forEach { byId[it.key] = it }
-        archived.forEach { byId.putIfAbsent(it.key, it) }
         mms.forEach { byId.putIfAbsent(it.key, it) }
         outbox.forEach { byId.putIfAbsent(it.key, it) }
-        byId.values.sortedByDescending { it.date }
+        // Locally-archived threads are re-classified as ARCHIVED so they only
+        // show up under the 归档 filter.
+        val archived = archivedIds()
+        byId.values
+            .map { msg ->
+                if (msg.threadId in archived && msg.category != MessageCategory.ARCHIVED) {
+                    msg.copy(category = MessageCategory.ARCHIVED)
+                } else msg
+            }
+            .sortedByDescending { it.date }
     }
 
     /** All messages (received + sent, SMS + MMS) of one conversation, oldest first. */

@@ -20,6 +20,7 @@ import android.provider.Telephony
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -62,6 +66,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -298,6 +303,7 @@ fun MainScreen(
                 onOpenOriginal = { msg ->
                     selectedThread = SmsThreadItem(msg, 0, 1)
                 },
+                onArchive = { threadId, archive -> vm.archiveThread(threadId, archive) },
                 onRequestPermission = {
                     permLauncher.launch(REQUIRED_PERMISSIONS)
                 },
@@ -327,6 +333,7 @@ private fun SmsListContent(
     onSetDefaultApp: () -> Unit,
     onOpenThread: (SmsThreadItem) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit,
+    onArchive: (Long, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -398,7 +405,14 @@ private fun SmsListContent(
                 item { EmptyBox("暂无短信") }
             } else {
                 items(threads, key = { it.message.threadId }) { thread ->
-                    MessageItem(thread = thread, onClick = { onOpenThread(thread) })
+                    SwipeableThreadRow(
+                        thread = thread,
+                        isArchivedView = state.filter == SmsFilter.ARCHIVED,
+                        onClick = { onOpenThread(thread) },
+                        onArchive = {
+                            onArchive(thread.message.threadId, state.filter != SmsFilter.ARCHIVED)
+                        }
+                    )
                 }
             }
         }
@@ -416,6 +430,49 @@ private fun EmptyBox(text: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/** A conversation row wrapped in a swipe-to-archive gesture (left swipe). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableThreadRow(
+    thread: SmsThreadItem,
+    isArchivedView: Boolean,
+    onClick: () -> Unit,
+    onArchive: () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onArchive()
+                true
+            } else {
+                false
+            }
+        }
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Text(
+                    text = if (isArchivedView) "取消归档" else "归档",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(end = 24.dp)
+                )
+            }
+        }
+    ) {
+        MessageItem(thread = thread, onClick = onClick)
     }
 }
 

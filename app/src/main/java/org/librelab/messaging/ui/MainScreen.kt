@@ -1,7 +1,11 @@
 package org.librelab.messaging.ui
 
 import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Archive
 import com.composables.icons.materialsymbols.outlined.Arrow_back
+import com.composables.icons.materialsymbols.outlined.Delete
+import com.composables.icons.materialsymbols.outlined.Deselect
+import com.composables.icons.materialsymbols.outlined.Select_all
 import com.composables.icons.materialsymbols.outlined.Chat
 import com.composables.icons.materialsymbols.outlined.Close
 import com.composables.icons.materialsymbols.outlined.Edit
@@ -115,6 +119,18 @@ fun MainScreen(
     var selectedThread by remember { mutableStateOf<SmsThreadItem?>(null) }
     val searchFocus = remember { FocusRequester() }
 
+    // Multi-select mode (long-press a conversation row to enter).
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val visibleThreadIds = state.visibleThreads.map { it.message.threadId }
+    val allSelected = visibleThreadIds.isNotEmpty() && selectedIds.containsAll(visibleThreadIds)
+    fun exitSelection() {
+        selectionMode = false
+        selectedIds = emptySet()
+        showDeleteConfirm = false
+    }
+
     // Entering search mode: focus the search field so the keyboard pops up.
     LaunchedEffect(state.searchActive) {
         if (state.searchActive) searchFocus.requestFocus()
@@ -199,13 +215,38 @@ fun MainScreen(
         return
     }
 
+    // Batch-delete confirmation.
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除会话") },
+            text = { Text("删除选中的 ${selectedIds.size} 个会话？此操作不可恢复。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.deleteThreads(selectedIds.toList())
+                        exitSelection()
+                    }
+                ) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
-                    if (state.searchActive) {
-                        TextField(
+                    when {
+                        selectionMode -> Text(
+                            text = "已选 ${selectedIds.size} 项",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        state.searchActive -> TextField(
                             value = state.searchQuery,
                             onValueChange = vm::setSearchQuery,
                             placeholder = { Text("搜索短信") },
@@ -220,8 +261,7 @@ fun MainScreen(
                                 .fillMaxWidth()
                                 .focusRequester(searchFocus)
                         )
-                    } else {
-                        Text(
+                        else -> Text(
                             text = "短信",
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.onBackground
@@ -229,7 +269,58 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    IconButton(
+                    if (selectionMode) {
+                        IconButton(
+                            onClick = {
+                                selectedIds = if (allSelected) emptySet() else visibleThreadIds.toSet()
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (allSelected) {
+                                    MaterialSymbols.Outlined.Deselect
+                                } else {
+                                    MaterialSymbols.Outlined.Select_all
+                                },
+                                contentDescription = "全选",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                vm.archiveThreads(selectedIds.toList(), archive = state.filter != SmsFilter.ARCHIVED)
+                                exitSelection()
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Archive,
+                                contentDescription = if (state.filter == SmsFilter.ARCHIVED) "取消归档" else "归档",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        IconButton(
+                            onClick = { showDeleteConfirm = true },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Delete,
+                                contentDescription = "删除",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        IconButton(
+                            onClick = { exitSelection() },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Close,
+                                contentDescription = "取消选择",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    } else {
+                        IconButton(
                         onClick = {
                             if (state.searchActive) {
                                 vm.setSearchQuery("")
@@ -255,6 +346,7 @@ fun MainScreen(
                             contentDescription = "设置",
                             tint = MaterialTheme.colorScheme.onBackground
                         )
+                    }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -304,6 +396,16 @@ fun MainScreen(
                     selectedThread = SmsThreadItem(msg, 0, 1)
                 },
                 onArchive = { threadId, archive -> vm.archiveThread(threadId, archive) },
+                selectionMode = selectionMode,
+                selectedIds = selectedIds,
+                onToggleSelect = { t ->
+                    val id = t.message.threadId
+                    selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+                },
+                onLongPress = { t ->
+                    selectionMode = true
+                    selectedIds = setOf(t.message.threadId)
+                },
                 onRequestPermission = {
                     permLauncher.launch(REQUIRED_PERMISSIONS)
                 },
@@ -334,6 +436,10 @@ private fun SmsListContent(
     onOpenThread: (SmsThreadItem) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit,
     onArchive: (Long, Boolean) -> Unit,
+    selectionMode: Boolean = false,
+    selectedIds: Set<Long> = emptySet(),
+    onToggleSelect: (SmsThreadItem) -> Unit = {},
+    onLongPress: (SmsThreadItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -405,14 +511,24 @@ private fun SmsListContent(
                 item { EmptyBox("暂无短信") }
             } else {
                 items(threads, key = { it.message.threadId }) { thread ->
-                    SwipeableThreadRow(
-                        thread = thread,
-                        isArchivedView = state.filter == SmsFilter.ARCHIVED,
-                        onClick = { onOpenThread(thread) },
-                        onArchive = {
-                            onArchive(thread.message.threadId, state.filter != SmsFilter.ARCHIVED)
-                        }
-                    )
+                    if (selectionMode) {
+                        MessageItem(
+                            thread = thread,
+                            onClick = { onToggleSelect(thread) },
+                            onLongClick = {},
+                            selected = thread.message.threadId in selectedIds
+                        )
+                    } else {
+                        SwipeableThreadRow(
+                            thread = thread,
+                            isArchivedView = state.filter == SmsFilter.ARCHIVED,
+                            onClick = { onOpenThread(thread) },
+                            onLongPress = { onLongPress(thread) },
+                            onArchive = {
+                                onArchive(thread.message.threadId, state.filter != SmsFilter.ARCHIVED)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -440,6 +556,7 @@ private fun SwipeableThreadRow(
     thread: SmsThreadItem,
     isArchivedView: Boolean,
     onClick: () -> Unit,
+    onLongPress: () -> Unit = {},
     onArchive: () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
@@ -476,7 +593,7 @@ private fun SwipeableThreadRow(
             }
         }
     ) {
-        MessageItem(thread = thread, onClick = onClick)
+        MessageItem(thread = thread, onClick = onClick, onLongClick = onLongPress)
     }
 }
 

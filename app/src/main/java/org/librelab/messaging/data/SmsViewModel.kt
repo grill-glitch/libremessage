@@ -150,6 +150,24 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Batch archive (or restore) several conversations. */
+    fun archiveThreads(ids: List<Long>, archive: Boolean) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.archiveThread(it, archive) }
+            refresh()
+        }
+    }
+
+    /** Batch delete several conversations (permanent). */
+    fun deleteThreads(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.deleteThread(it) }
+            refresh()
+        }
+    }
+
     fun loadThread(threadId: Long) {
         viewModelScope.launch {
             val thread = repository.queryThread(threadId)

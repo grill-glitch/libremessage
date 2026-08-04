@@ -1,10 +1,13 @@
 package org.librelab.messaging.ui
 
 import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Check_circle
 import com.composables.icons.materialsymbols.outlined.Package_2
 import com.composables.icons.materialsymbols.outlined.Safety_check
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.outlined.Check_circle
 import com.composables.icons.materialsymbols.outlined.Package_2
 import com.composables.icons.materialsymbols.outlined.Safety_check
 import org.librelab.messaging.data.MessageCategory
@@ -39,11 +43,14 @@ import org.librelab.messaging.util.formatRelativeTime
  * D. Conversation list item — 48dp circular avatar, sender + latest body,
  * time + unread count badge. Height ~72dp. One row per sender (thread).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageItem(
     thread: SmsThreadItem,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLongClick: () -> Unit = {},
+    selected: Boolean = false
 ) {
     val message = thread.message
     Row(
@@ -51,11 +58,23 @@ fun MessageItem(
             .fillMaxWidth()
             .height(72.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick)
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surface
+            )
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selected) {
+            Icon(
+                imageVector = MaterialSymbols.Outlined.Check_circle,
+                contentDescription = "已选择",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+        }
         Avatar(message)
         Spacer(Modifier.width(12.dp))
 

@@ -55,6 +55,25 @@ class SmsRepository(private val context: Context) {
             .apply()
     }
 
+    /** Permanently delete a conversation (all its sms + mms rows). */
+    suspend fun deleteThread(threadId: Long): Boolean = withContext(Dispatchers.IO) {
+        try {
+            resolver.delete(
+                Telephony.Sms.CONTENT_URI,
+                "${Telephony.Sms.THREAD_ID} = ?",
+                arrayOf(threadId.toString())
+            )
+            resolver.delete(
+                mmsUri,
+                "thread_id = ?",
+                arrayOf(threadId.toString())
+            )
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     suspend fun loadAll(): List<SmsMessage> = withContext(Dispatchers.IO) {
         val inbox = query(
             uri = Telephony.Sms.Inbox.CONTENT_URI,

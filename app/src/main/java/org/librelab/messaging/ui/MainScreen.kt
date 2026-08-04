@@ -196,7 +196,7 @@ fun MainScreen(
                     } else {
                         Text(
                             text = "短信",
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                     }

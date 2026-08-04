@@ -461,16 +461,19 @@ private fun SmsListContent(
             }
         }
 
-        // The smart banner is always present, regardless of the filter chip.
-        item {
-            SmartCodeCard(
-                message = state.latestCode,
-                allCodes = state.allCodeEntries,
-                onCopy = onCopyCode,
-                onOpenOriginal = onOpenOriginal
-            )
-        }
+        // Filter chips on top; the smart banner sits below and only shows
+        // on the 全部 (ALL) filter.
         item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
+        if (state.filter == SmsFilter.ALL) {
+            item {
+                SmartCodeCard(
+                    message = state.latestCode,
+                    allCodes = state.allCodeEntries,
+                    onCopy = onCopyCode,
+                    onOpenOriginal = onOpenOriginal
+                )
+            }
+        }
 
         // 验证码/包裹 filters: the messages themselves become cards.
         if (state.filter == SmsFilter.CODE) {

@@ -824,7 +824,17 @@ private fun MessageBubble(
         ) {
             Column(horizontalAlignment = Alignment.End) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, message, onOpenImage, onSaveImage, onStartMultiSelect = { onStartMultiSelect(message) }, onRequestDelete = { confirmDelete = true })
+                    MmsImage(
+                        uri,
+                        message,
+                        onOpenImage,
+                        onSaveImage,
+                        multiSelect = multiSelect,
+                        selected = selected,
+                        onToggle = { onToggleSelect(message.key) },
+                        onStartMultiSelect = { onStartMultiSelect(message) },
+                        onRequestDelete = { confirmDelete = true }
+                    )
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -876,7 +886,17 @@ private fun MessageBubble(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.Start) {
                 message.imageUris.forEach { uri ->
-                    MmsImage(uri, message, onOpenImage, onSaveImage, onStartMultiSelect = { onStartMultiSelect(message) }, onRequestDelete = { confirmDelete = true })
+                    MmsImage(
+                        uri,
+                        message,
+                        onOpenImage,
+                        onSaveImage,
+                        multiSelect = multiSelect,
+                        selected = selected,
+                        onToggle = { onToggleSelect(message.key) },
+                        onStartMultiSelect = { onStartMultiSelect(message) },
+                        onRequestDelete = { confirmDelete = true }
+                    )
                 }
                 if (message.body.isNotBlank()) {
                     BubbleContent(
@@ -930,13 +950,18 @@ private fun MessageBubble(
 }
 
 /** MMS image, rendered outside the bubble with a soft corner radius.
- * Tap to view full-screen; long-press pops the action menu at the touch. */
+ * Tap to view full-screen; long-press pops the action menu at the touch.
+ * In multi-select mode the tap toggles selection instead of opening the
+ * viewer (and the border highlights the selected state). */
 @Composable
 private fun MmsImage(
     uri: android.net.Uri,
     message: SmsMessage,
     onOpenImage: (android.net.Uri) -> Unit,
     onSaveImage: (android.net.Uri) -> Unit,
+    multiSelect: Boolean = false,
+    selected: Boolean = false,
+    onToggle: () -> Unit = {},
     onStartMultiSelect: () -> Unit = {},
     onRequestDelete: () -> Unit
 ) {
@@ -944,17 +969,24 @@ private fun MmsImage(
     Box {
         AsyncImage(
             model = uri,
-            contentDescription = stringResource(R.string.image_message),
+            contentDescription = stringResource(R.string.image),
             modifier = Modifier
                 .padding(bottom = 6.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .sizeIn(maxWidth = 220.dp, maxHeight = 280.dp)
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onTap = { onOpenImage(uri) },
-                        onLongPress = { menuAt = it }
+                        onTap = { if (multiSelect) onToggle() else onOpenImage(uri) },
+                        onLongPress = { if (multiSelect) onToggle() else menuAt = it }
                     )
                 }
+                .then(
+                    if (selected) {
+                        Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                    } else Modifier
+                )
         )
         menuAt?.let {
             MessageActionMenu(

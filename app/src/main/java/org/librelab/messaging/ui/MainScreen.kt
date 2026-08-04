@@ -351,9 +351,19 @@ private fun SmsListContent(
             }
         }
 
+        // The smart banner is always present, regardless of the filter chip.
+        item {
+            SmartCodeCard(
+                message = state.latestCode,
+                allCodes = state.allCodeEntries,
+                onCopy = onCopyCode,
+                onOpenOriginal = onOpenOriginal
+            )
+        }
+        item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
+
         // 验证码/包裹 filters: the messages themselves become cards.
         if (state.filter == SmsFilter.CODE) {
-            item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
             val codes = state.allCodeEntries
             if (codes.isEmpty()) {
                 item { EmptyBox("暂无验证码短信") }
@@ -367,7 +377,6 @@ private fun SmsListContent(
                 }
             }
         } else if (state.filter == SmsFilter.PACKAGE) {
-            item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
             val pickups = state.allPickups
             if (pickups.isEmpty()) {
                 item { EmptyBox("暂无取件码短信") }
@@ -381,19 +390,6 @@ private fun SmsListContent(
                 }
             }
         } else {
-            // ALL / AD / ARCHIVED: smart banner (ALL) then conversation rows.
-            if (state.filter == SmsFilter.ALL) {
-                item {
-                    SmartCodeCard(
-                        message = state.latestCode,
-                        allCodes = state.allCodeEntries,
-                        onCopy = onCopyCode,
-                        onOpenOriginal = onOpenOriginal
-                    )
-                }
-            }
-            item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
-
             val threads = state.visibleThreads
             if (threads.isEmpty()) {
                 item { EmptyBox("暂无短信") }

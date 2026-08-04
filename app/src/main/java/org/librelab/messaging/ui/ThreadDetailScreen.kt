@@ -149,7 +149,7 @@ fun ThreadDetailScreen(
     val imeBottom = WindowInsets.ime.getBottom(density)
     val imeOffset by animateIntAsState(
         targetValue = imeBottom,
-        animationSpec = tween(durationMillis = 220),
+        animationSpec = tween(durationMillis = 120),
         label = "imeLift"
     )
 

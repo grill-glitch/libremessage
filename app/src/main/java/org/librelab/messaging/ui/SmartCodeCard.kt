@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
@@ -236,84 +236,86 @@ internal fun CodeCardRow(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
+        Box(
+            Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .heightIn(min = 170.dp)
         ) {
-            Icon(
-                imageVector = if (codeMsg.codeLabel == "取件码") {
-                    MaterialSymbols.Outlined.Package_2
-                } else {
-                    MaterialSymbols.Outlined.Safety_check
-                },
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            // Minimum height so the elastic spacer can push the
-            // time + 原始短信 row to the bottom edge of the card.
-            Column(
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = 128.dp)
+            // Main content, bottom padding leaves room for the footer bar.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 52.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = codeMsg.merchantName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = codeMsg.code?.let(SmsParser::formatCode) ?: "",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Text(
-                    text = codeMsg.body,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                Icon(
+                    imageVector = if (codeMsg.codeLabel == "取件码") {
+                        MaterialSymbols.Outlined.Package_2
+                    } else {
+                        MaterialSymbols.Outlined.Safety_check
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
                 )
-                // Elastic spacer pushes the time + 原始短信 row to the
-                // bottom-right corner of the card.
-                Spacer(Modifier.weight(1f))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.End),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Text(
-                        text = formatSendTime(codeMsg.date),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(
-                        onClick = { onOpenOriginal(codeMsg) },
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
-                    ) {
-                        Text("原始短信", style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = codeMsg.merchantName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = codeMsg.code?.let(SmsParser::formatCode) ?: "",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
+                    Text(
+                        text = codeMsg.body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+            }
+
+            // Footer bar pinned to the card's bottom-right corner:
+            // send time + 原始短信 + copy, always at the very bottom.
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatSendTime(codeMsg.date),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(Modifier.width(6.dp))
+                TextButton(
+                    onClick = { onOpenOriginal(codeMsg) },
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                ) {
+                    Text("原始短信", style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton(
-                onClick = { codeMsg.code?.let(onCopy) },
-                enabled = codeMsg.hasCode
+                    onClick = { codeMsg.code?.let(onCopy) },
+                    enabled = codeMsg.hasCode,
+                    modifier = Modifier.size(32.dp)
                 ) {
-                Icon(
-                    imageVector = MaterialSymbols.Outlined.Content_copy,
-                    contentDescription = "复制",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                    Icon(
+                        imageVector = MaterialSymbols.Outlined.Content_copy,
+                        contentDescription = "复制",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
+            }
         }
     }
 }

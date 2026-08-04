@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Librelab 短信</string>
+    <string name="app_name">短信</string>
     <string name="notification_channel_sms">新短信通知</string>
     <string name="copy_code">复制验证码</string>
     <string name="code_copied">验证码已复制到剪贴板</string>

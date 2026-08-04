@@ -165,12 +165,6 @@ fun SmartCodeCard(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    text = message?.let { formatSendTime(it.date) } ?: "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                Spacer(Modifier.width(8.dp))
                 TextButton(
                     onClick = { message?.let(onOpenOriginal) },
                     enabled = message != null,
@@ -178,6 +172,12 @@ fun SmartCodeCard(
                 ) {
                     Text("原始短信", style = MaterialTheme.typography.labelMedium)
                 }
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = message?.let { formatSendTime(it.date) } ?: "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         }
     }

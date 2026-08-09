@@ -82,11 +82,13 @@ fun FilterChipRow(
                         )
                     },
                     shape = RoundedCornerShape(10.dp),
+                    // No container at all — transparent chips, the selected
+                    // one is marked only by the sliding indicator below.
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
                         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        selectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        selectedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
                         selectedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         selectedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),

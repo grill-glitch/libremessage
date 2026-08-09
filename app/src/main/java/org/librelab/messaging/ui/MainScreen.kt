@@ -51,6 +51,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -79,6 +81,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -99,6 +102,7 @@ import org.librelab.messaging.R
 import org.librelab.messaging.data.SmsFilter
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsThreadItem
+import kotlinx.coroutines.launch
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.data.UiState
 
@@ -551,87 +555,214 @@ private fun SmsListContent(
     onLongPress: (SmsThreadItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    val scope = rememberCoroutineScope()
+    val filters = remember { SmsFilter.entries.toList() }
+    val pagerState = rememberPagerState(initialPage = filters.indexOf(state.filter)) { filters.size }
+
+    // Swipe left/right on the list switches the category chip.
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress) {
+            onFilter(filters[pagerState.currentPage])
+        }
+    }
+
+    Column(modifier = modifier) {
         if (!state.hasSmsPermission) {
-            item {
-                SetupCard(
-                    title = stringResource(R.string.setup_permission_title),
-                    body = stringResource(R.string.setup_permission_body),
-                    buttonText = stringResource(R.string.action_grant),
-                    onClick = onRequestPermission
-                )
-            }
+            SetupCard(
+                title = stringResource(R.string.setup_permission_title),
+                body = stringResource(R.string.setup_permission_body),
+                buttonText = stringResource(R.string.action_grant),
+                onClick = onRequestPermission
+            )
         } else if (!state.isDefaultSmsApp) {
-            item {
-                SetupCard(
-                    title = stringResource(R.string.setup_default_title),
-                    body = stringResource(R.string.setup_default_body),
-                    buttonText = stringResource(R.string.action_go_settings),
-                    onClick = onSetDefaultApp
+            SetupCard(
+                title = stringResource(R.string.setup_default_title),
+                body = stringResource(R.string.setup_default_body),
+                buttonText = stringResource(R.string.action_go_settings),
+                onClick = onSetDefaultApp
+            )
+        }
+
+        // Filter chips pinned on top; swiping the content below switches the
+        // active category, and tapping a chip animates the pager to it.
+        // The sliding indicator under the chips follows the drag so the
+        // highlight moves with the finger.
+        FilterChipRow(
+            page = pagerState.currentPage,
+            pageOffset = pagerState.currentPageOffsetFraction,
+            onSelect = { filter ->
+                onFilter(filter)
+                scope.launch { pagerState.animateScrollToPage(filters.indexOf(filter)) }
+            }
+        )
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f)
+        ) { page ->
+            val filter = filters[page]
+            when (filter) {
+                SmsFilter.ALL -> AllFilterPage(
+                    state = state,
+                    onCopyCode = onCopyCode,
+                    onOpenOriginal = onOpenOriginal,
+                    onOpenThread = onOpenThread,
+                    selectionMode = selectionMode,
+                    selectedIds = selectedIds,
+                    onToggleSelect = onToggleSelect,
+                    onLongPress = onLongPress
+                )
+                SmsFilter.CODE -> CodeFilterPage(
+                    state = state,
+                    onCopyCode = onCopyCode,
+                    onOpenOriginal = onOpenOriginal
+                )
+                SmsFilter.PACKAGE -> PackageFilterPage(
+                    state = state,
+                    onCopyCode = onCopyCode,
+                    onOpenOriginal = onOpenOriginal
+                )
+                SmsFilter.AD -> ThreadFilterPage(
+                    filter = filter,
+                    state = state,
+                    onOpenThread = onOpenThread,
+                    selectionMode = selectionMode,
+                    selectedIds = selectedIds,
+                    onToggleSelect = onToggleSelect,
+                    onLongPress = onLongPress
+                )
+                SmsFilter.ARCHIVED -> ThreadFilterPage(
+                    filter = filter,
+                    state = state,
+                    onOpenThread = onOpenThread,
+                    selectionMode = selectionMode,
+                    selectedIds = selectedIds,
+                    onToggleSelect = onToggleSelect,
+                    onLongPress = onLongPress
                 )
             }
         }
+    }
+}
 
-        // Filter chips on top; the smart banner sits below and only shows
-        // on the 全部 (ALL) filter.
-        item { FilterChipRow(selected = state.filter, onSelect = onFilter) }
-        if (state.filter == SmsFilter.ALL) {
-            item {
-                SmartCodeCard(
-                    message = state.latestCode,
-                    allCodes = state.allCodeEntries,
+@Composable
+private fun AllFilterPage(
+    state: UiState,
+    onCopyCode: (String) -> Unit,
+    onOpenOriginal: (SmsMessage) -> Unit,
+    onOpenThread: (SmsThreadItem) -> Unit,
+    selectionMode: Boolean,
+    selectedIds: Set<Long>,
+    onToggleSelect: (SmsThreadItem) -> Unit,
+    onLongPress: (SmsThreadItem) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            SmartCodeCard(
+                message = state.latestCode,
+                allCodes = state.allCodeEntries,
+                onCopy = onCopyCode,
+                onOpenOriginal = onOpenOriginal
+            )
+        }
+        val threads = state.visibleThreads
+        if (threads.isEmpty()) {
+            item { EmptyBox(stringResource(R.string.empty_sms)) }
+        } else {
+            items(threads, key = { it.message.threadId }) { thread ->
+                MessageItem(
+                    thread = thread,
+                    onClick = {
+                        if (selectionMode) onToggleSelect(thread) else onOpenThread(thread)
+                    },
+                    onLongClick = { onLongPress(thread) },
+                    selected = thread.message.threadId in selectedIds
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CodeFilterPage(
+    state: UiState,
+    onCopyCode: (String) -> Unit,
+    onOpenOriginal: (SmsMessage) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        val codes = state.codeEntries
+        if (codes.isEmpty()) {
+            item { EmptyBox(stringResource(R.string.empty_codes)) }
+        } else {
+            items(codes, key = { "${it.key}_${it.code}" }) { msg ->
+                CodeCardRow(
+                    codeMsg = msg,
                     onCopy = onCopyCode,
                     onOpenOriginal = onOpenOriginal
                 )
             }
         }
+    }
+}
 
-        // 验证码 filter: pure verification codes only (pickup codes are 包裹).
-        if (state.filter == SmsFilter.CODE) {
-            val codes = state.codeEntries
-            if (codes.isEmpty()) {
-                item { EmptyBox(stringResource(R.string.empty_codes)) }
-            } else {
-                items(codes, key = { "${it.key}_${it.code}" }) { msg ->
-                    CodeCardRow(
-                        codeMsg = msg,
-                        onCopy = onCopyCode,
-                        onOpenOriginal = onOpenOriginal
-                    )
-                }
-            }
-        } else if (state.filter == SmsFilter.PACKAGE) {
-            val pickups = state.allPickups
-            if (pickups.isEmpty()) {
-                item { EmptyBox(stringResource(R.string.empty_pickups)) }
-            } else {
-                items(pickups, key = { "${it.key}_${it.code}" }) { msg ->
-                    CodeCardRow(
-                        codeMsg = msg,
-                        onCopy = onCopyCode,
-                        onOpenOriginal = onOpenOriginal
-                    )
-                }
-            }
+@Composable
+private fun PackageFilterPage(
+    state: UiState,
+    onCopyCode: (String) -> Unit,
+    onOpenOriginal: (SmsMessage) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        val pickups = state.allPickups
+        if (pickups.isEmpty()) {
+            item { EmptyBox(stringResource(R.string.empty_pickups)) }
         } else {
-            val threads = state.visibleThreads
-            if (threads.isEmpty()) {
-                item { EmptyBox(stringResource(R.string.empty_sms)) }
-            } else {
-                items(threads, key = { it.message.threadId }) { thread ->
-                    MessageItem(
-                        thread = thread,
-                        onClick = {
-                            if (selectionMode) onToggleSelect(thread) else onOpenThread(thread)
-                        },
-                        onLongClick = { onLongPress(thread) },
-                        selected = thread.message.threadId in selectedIds
-                    )
-                }
+            items(pickups, key = { "${it.key}_${it.code}" }) { msg ->
+                CodeCardRow(
+                    codeMsg = msg,
+                    onCopy = onCopyCode,
+                    onOpenOriginal = onOpenOriginal
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThreadFilterPage(
+    filter: SmsFilter,
+    state: UiState,
+    onOpenThread: (SmsThreadItem) -> Unit,
+    selectionMode: Boolean,
+    selectedIds: Set<Long>,
+    onToggleSelect: (SmsThreadItem) -> Unit,
+    onLongPress: (SmsThreadItem) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        val threads = state.visibleThreads
+        if (threads.isEmpty()) {
+            item { EmptyBox(stringResource(R.string.empty_sms)) }
+        } else {
+            items(threads, key = { it.message.threadId }) { thread ->
+                MessageItem(
+                    thread = thread,
+                    onClick = {
+                        if (selectionMode) onToggleSelect(thread) else onOpenThread(thread)
+                    },
+                    onLongClick = { onLongPress(thread) },
+                    selected = thread.message.threadId in selectedIds
+                )
             }
         }
     }

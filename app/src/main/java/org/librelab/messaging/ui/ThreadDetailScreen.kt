@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Telephony
 import android.os.Build
 import android.os.Environment
 import android.provider.BlockedNumberContract
@@ -156,7 +157,10 @@ fun ThreadDetailScreen(
     // New-thread mode: the FAB opens this screen with threadId=0. Instead of
     // a conversation, show a recipient field (auto-focused, keyboard pops)
     // plus a contact list filtered by the typed query (A-Z when empty).
-    val isNewThread = threadId == 0L
+    // After the first send we flip to the real thread id so the outgoing
+    // message appears in the list.
+    var currentThreadId by remember { mutableStateOf(threadId) }
+    val isNewThread = currentThreadId == 0L
     var newNumber by remember { mutableStateOf(if (isNewThread) address else "") }
     val numberFocus = remember { FocusRequester() }
     val collator = remember { java.text.Collator.getInstance(java.util.Locale.CHINA) }
@@ -268,7 +272,7 @@ fun ThreadDetailScreen(
                                 .focusRequester(numberFocus)
                         )
                     } else {
-                        val titleText = if (isNewThread) newNumber else sender
+                        val titleText = if (isNewThread) newNumber else sender.ifBlank { address }
                         val ac = avatarColorFor(titleText)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             InitialAvatar(
@@ -463,6 +467,11 @@ fun ThreadDetailScreen(
                                 if (sent) {
                                     pendingImage = null
                                     input = ""
+                                    if (currentThreadId == 0L) {
+                                        val realId = Telephony.Threads.getOrCreateThreadId(context, targetAddress)
+                                        currentThreadId = realId
+                                        vm.openThread(realId)
+                                    }
                                     vm.refresh()
                                 } else {
                                     Toast.makeText(
@@ -503,6 +512,15 @@ fun ThreadDetailScreen(
                     if (ok) {
                         pendingImage = null
                         input = ""
+                        if (currentThreadId == 0L) {
+                            // First send from new-thread mode: resolve the
+                            // real thread and open it (updates selectedThreadId
+                            // so the ContentObserver refresh reloads this
+                            // thread instead of the empty thread-0 list).
+                            val realId = Telephony.Threads.getOrCreateThreadId(context, targetAddress)
+                            currentThreadId = realId
+                            vm.openThread(realId)
+                        }
                         vm.refresh() // ContentObserver also fires; refresh re-loads the thread
                     } else if (image != null) {
                         Toast.makeText(context, R.string.toast_mms_failed, Toast.LENGTH_SHORT).show()

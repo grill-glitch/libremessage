@@ -105,9 +105,12 @@ class SmsRepository(private val context: Context) {
     }
 
     suspend fun loadAll(): List<SmsMessage> = withContext(Dispatchers.IO) {
-        val inbox = query(
-            uri = Telephony.Sms.Inbox.CONTENT_URI,
-            selection = null,
+        // The inbox URI only returns type=1 rows, hiding every message this
+        // app sent (type=2/5/6). Query the full sms table instead so sent
+        // messages and their conversations show up on the home list.
+        val sms = query(
+            uri = Telephony.Sms.CONTENT_URI,
+            selection = "${Telephony.Sms.TYPE} IN (1,2,4,5,6)",
             selectionArgs = null,
             sortOrder = "${Telephony.Sms.DATE} DESC"
         )
@@ -116,7 +119,7 @@ class SmsRepository(private val context: Context) {
         // Deduplicate by unique key (sms and mms ids may overlap so keys
         // carry a type prefix).
         val byId = LinkedHashMap<String, SmsMessage>()
-        inbox.forEach { byId[it.key] = it }
+        sms.forEach { byId[it.key] = it }
         mms.forEach { byId.putIfAbsent(it.key, it) }
         outbox.forEach { byId.putIfAbsent(it.key, it) }
         // Locally-archived threads are re-classified as ARCHIVED so they only

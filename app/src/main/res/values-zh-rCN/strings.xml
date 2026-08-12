@@ -88,6 +88,12 @@
     <string name="settings_sim_none">无(系统默认)</string>
     <string name="sim_pick_title">使用电话卡发送</string>
     <string name="sim_auto">自动(系统默认)</string>
+    <string name="shortcut_compose">新建短信</string>
+    <string name="shortcut_compose_long">新建短信</string>
+    <string name="shortcut_codes">验证码</string>
+    <string name="shortcut_codes_long">查看验证码</string>
+    <string name="shortcut_pickups">取件码</string>
+    <string name="shortcut_pickups_long">查看取件码</string>
     <string name="settings_default_app_active">当前已是系统默认短信应用</string>
     <string name="settings_default_app_hint">设为默认短信应用后，本应用才能读取系统短信数据库。</string>
     <string name="settings_ads_in_all">全部标签显示广告短信</string>

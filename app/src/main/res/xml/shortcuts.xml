@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="compose"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_compose"
+        android:shortcutShortLabel="@string/shortcut_compose"
+        android:shortcutLongLabel="@string/shortcut_compose_long">
+        <intent
+            android:action="org.librelab.messaging.action.NEW_MESSAGE"
+            android:targetPackage="org.librelab.messaging"
+            android:targetClass="org.librelab.messaging.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="codes"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_code"
+        android:shortcutShortLabel="@string/shortcut_codes"
+        android:shortcutLongLabel="@string/shortcut_codes_long">
+        <intent
+            android:action="org.librelab.messaging.action.OPEN_CODES"
+            android:targetPackage="org.librelab.messaging"
+            android:targetClass="org.librelab.messaging.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="pickups"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_package"
+        android:shortcutShortLabel="@string/shortcut_pickups"
+        android:shortcutLongLabel="@string/shortcut_pickups_long">
+        <intent
+            android:action="org.librelab.messaging.action.OPEN_PICKUPS"
+            android:targetPackage="org.librelab.messaging"
+            android:targetClass="org.librelab.messaging.MainActivity" />
+    </shortcut>
+</shortcuts>

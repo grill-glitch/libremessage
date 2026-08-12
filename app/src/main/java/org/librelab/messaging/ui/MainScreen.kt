@@ -151,17 +151,26 @@ fun MainScreen(
     vm: SmsViewModel = viewModel(),
     initialNumber: String = "",
     initialBody: String = "",
-    initialAttachmentUri: String = ""
+    initialAttachmentUri: String = "",
+    shortcutTarget: Int = 0
 ) {
     val navController = rememberNavController()
 
     // Deep-link: launch straight into a new-conversation draft when the
-    // activity was started with a number/body/attachment (share intent).
+    // activity was started with a number/body/attachment (share intent),
+    // or into the matching filter tab via a launcher shortcut (2 = codes,
+    // 3 = pickups).
     LaunchedEffect(Unit) {
-        if (initialNumber.isNotBlank() || initialBody.isNotBlank() || initialAttachmentUri.isNotBlank()) {
+        if (shortcutTarget == 1 ||
+            initialNumber.isNotBlank() || initialBody.isNotBlank() || initialAttachmentUri.isNotBlank()
+        ) {
             navController.navigate(
                 ThreadRoute(0L, initialNumber, "", initialAttachmentUri, initialBody)
             )
+        } else if (shortcutTarget == 2) {
+            vm.setFilter(SmsFilter.CODE)
+        } else if (shortcutTarget == 3) {
+            vm.setFilter(SmsFilter.PACKAGE)
         }
     }
 
@@ -604,10 +613,24 @@ private fun SmsListContent(
     val filters = remember { SmsFilter.entries.toList() }
     val pagerState = rememberPagerState(initialPage = filters.indexOf(state.filter)) { filters.size }
 
-    // Swipe left/right on the list switches the category chip.
+    // Swipe left/right on the list switches the category chip. Only fire
+    // after the user actually swiped — on first composition currentPage is
+    // the initial page (possibly ALL) and would clobber a filter set by a
+    // launcher shortcut / deep link.
+    var userSwiped by remember { mutableStateOf(false) }
     LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress && userSwiped) {
             onFilter(filters[pagerState.currentPage])
+        }
+        if (pagerState.isScrollInProgress) userSwiped = true
+    }
+
+    // External filter changes (settings shortcut, deep link) move the pager
+    // to the matching page.
+    LaunchedEffect(state.filter) {
+        val idx = filters.indexOf(state.filter)
+        if (idx >= 0 && idx != pagerState.currentPage) {
+            pagerState.scrollToPage(idx)
         }
     }
 

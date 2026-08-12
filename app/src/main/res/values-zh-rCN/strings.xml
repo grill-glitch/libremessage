@@ -94,6 +94,8 @@
     <string name="shortcut_codes_long">查看验证码</string>
     <string name="shortcut_pickups">取件码</string>
     <string name="shortcut_pickups_long">查看取件码</string>
+    <string name="widget_code_icon_desc">验证码</string>
+    <string name="widget_no_code">暂无验证码</string>
     <string name="settings_default_app_active">当前已是系统默认短信应用</string>
     <string name="settings_default_app_hint">设为默认短信应用后，本应用才能读取系统短信数据库。</string>
     <string name="settings_ads_in_all">全部标签显示广告短信</string>

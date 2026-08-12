@@ -36,6 +36,9 @@ class SmsReceiver : BroadcastReceiver() {
         if (action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
             insertInbox(context, sms)
         }
+        // Home-screen widgets read the SMS table directly: nudge them so a
+        // fresh code/thread appears without waiting for the 30-min tick.
+        runCatching { CodeWidgetProvider.requestRefresh(context) }
 
         val prefs = context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
         val category = SmsParser.classify(body, hasContact = false, archived = false)

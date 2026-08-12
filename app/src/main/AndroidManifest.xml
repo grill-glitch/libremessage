@@ -39,7 +39,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Long-press launcher shortcuts: new message / codes / pickups -->
+            <!-- Launcher long-press shortcuts: new message / codes / pickups -->
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -71,6 +71,18 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+
+        <!-- Verification-code card widget (2×1 / 2×3). -->
+        <receiver
+            android:name=".CodeWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/code_widget_info" />
+        </receiver>
 
         <!-- Incoming SMS: SMS_RECEIVED reaches every receiver, SMS_DELIVER is
              routed exclusively to the default SMS app. Both land here. -->

@@ -36,6 +36,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +54,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,6 +88,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -279,6 +286,9 @@ private fun HomeScreen(
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    // Scrolling down hides the FAB + bottom bar; scrolling up brings them
+    // back (animated). Only on the conversation list, not in selection mode.
+    var hideChrome by remember { mutableStateOf(false) }
     val visibleThreadIds = state.visibleThreads.map { it.message.threadId }
     val allSelected = visibleThreadIds.isNotEmpty() && selectedIds.containsAll(visibleThreadIds)
     fun exitSelection() {
@@ -468,21 +478,32 @@ private fun HomeScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onCompose("") },
-                shape = RoundedCornerShape(18.dp),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(64.dp)
+            AnimatedVisibility(
+                visible = !hideChrome || selectionMode,
+                enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                exit = fadeOut() + scaleOut(targetScale = 0.8f)
             ) {
-                Icon(
-                    imageVector = MaterialSymbols.Outlined.Edit,
-                    contentDescription = stringResource(R.string.action_new_sms),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                FloatingActionButton(
+                    onClick = { onCompose("") },
+                    shape = RoundedCornerShape(18.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Outlined.Edit,
+                        contentDescription = stringResource(R.string.action_new_sms),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
         },
         bottomBar = {
-            NavigationBar {
+            AnimatedVisibility(
+                visible = !hideChrome || selectionMode,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                NavigationBar {
                 NavigationBarItem(
                     selected = state.tab == 0,
                     onClick = { vm.setTab(0) },
@@ -498,6 +519,7 @@ private fun HomeScreen(
                     icon = { Icon(MaterialSymbols.Outlined.Group, contentDescription = null) },
                     label = { Text(stringResource(R.string.tab_contacts)) }
                 )
+                }
             }
         }
     ) { innerPadding ->
@@ -505,6 +527,7 @@ private fun HomeScreen(
             0 -> SmsListContent(
                 state = state,
                 onFilter = vm::setFilter,
+                onScrollDirection = { down -> hideChrome = down },
                 onCopyCode = { code -> copyCode(context, code) },
                 onOpenOriginal = { msg ->
                     onOpenThread(SmsThreadItem(msg, 0, 1))
@@ -543,6 +566,7 @@ private fun HomeScreen(
 private fun SmsListContent(
     state: UiState,
     onFilter: (SmsFilter) -> Unit,
+    onScrollDirection: (Boolean) -> Unit = {}, // true = scrolling down (hide chrome)
     onCopyCode: (String) -> Unit,
     onRequestPermission: () -> Unit,
     onSetDefaultApp: () -> Unit,
@@ -609,17 +633,20 @@ private fun SmsListContent(
                     selectionMode = selectionMode,
                     selectedIds = selectedIds,
                     onToggleSelect = onToggleSelect,
-                    onLongPress = onLongPress
+                    onLongPress = onLongPress,
+                    onScrollDirection = onScrollDirection
                 )
                 SmsFilter.CODE -> CodeFilterPage(
                     state = state,
                     onCopyCode = onCopyCode,
-                    onOpenOriginal = onOpenOriginal
+                    onOpenOriginal = onOpenOriginal,
+                    onScrollDirection = onScrollDirection
                 )
                 SmsFilter.PACKAGE -> PackageFilterPage(
                     state = state,
                     onCopyCode = onCopyCode,
-                    onOpenOriginal = onOpenOriginal
+                    onOpenOriginal = onOpenOriginal,
+                    onScrollDirection = onScrollDirection
                 )
                 SmsFilter.AD -> ThreadFilterPage(
                     filter = filter,
@@ -628,7 +655,8 @@ private fun SmsListContent(
                     selectionMode = selectionMode,
                     selectedIds = selectedIds,
                     onToggleSelect = onToggleSelect,
-                    onLongPress = onLongPress
+                    onLongPress = onLongPress,
+                    onScrollDirection = onScrollDirection
                 )
                 SmsFilter.ARCHIVED -> ThreadFilterPage(
                     filter = filter,
@@ -637,11 +665,33 @@ private fun SmsListContent(
                     selectionMode = selectionMode,
                     selectedIds = selectedIds,
                     onToggleSelect = onToggleSelect,
-                    onLongPress = onLongPress
+                    onLongPress = onLongPress,
+                    onScrollDirection = onScrollDirection
                 )
             }
         }
     }
+}
+
+@Composable
+private fun rememberScrollDirectionState(onScrollDirection: (Boolean) -> Unit): LazyListState {
+    val listState = rememberLazyListState()
+    LaunchedEffect(listState) {
+        var lastIndex = listState.firstVisibleItemIndex
+        var lastOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                if (index != lastIndex) {
+                    onScrollDirection(index > lastIndex)
+                    lastIndex = index
+                    lastOffset = offset
+                } else if (offset != lastOffset) {
+                    onScrollDirection(offset > lastOffset)
+                    lastOffset = offset
+                }
+            }
+    }
+    return listState
 }
 
 @Composable
@@ -653,9 +703,12 @@ private fun AllFilterPage(
     selectionMode: Boolean,
     selectedIds: Set<Long>,
     onToggleSelect: (SmsThreadItem) -> Unit,
-    onLongPress: (SmsThreadItem) -> Unit
+    onLongPress: (SmsThreadItem) -> Unit,
+    onScrollDirection: (Boolean) -> Unit = {}
 ) {
+    val listState = rememberScrollDirectionState(onScrollDirection)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -689,9 +742,12 @@ private fun AllFilterPage(
 private fun CodeFilterPage(
     state: UiState,
     onCopyCode: (String) -> Unit,
-    onOpenOriginal: (SmsMessage) -> Unit
+    onOpenOriginal: (SmsMessage) -> Unit,
+    onScrollDirection: (Boolean) -> Unit = {}
 ) {
+    val listState = rememberScrollDirectionState(onScrollDirection)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -714,9 +770,12 @@ private fun CodeFilterPage(
 private fun PackageFilterPage(
     state: UiState,
     onCopyCode: (String) -> Unit,
-    onOpenOriginal: (SmsMessage) -> Unit
+    onOpenOriginal: (SmsMessage) -> Unit,
+    onScrollDirection: (Boolean) -> Unit = {}
 ) {
+    val listState = rememberScrollDirectionState(onScrollDirection)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -743,9 +802,12 @@ private fun ThreadFilterPage(
     selectionMode: Boolean,
     selectedIds: Set<Long>,
     onToggleSelect: (SmsThreadItem) -> Unit,
-    onLongPress: (SmsThreadItem) -> Unit
+    onLongPress: (SmsThreadItem) -> Unit,
+    onScrollDirection: (Boolean) -> Unit = {}
 ) {
+    val listState = rememberScrollDirectionState(onScrollDirection)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

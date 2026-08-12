@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Circular gold FAB background for the widget "new message" button. -->
+<!-- Rounded-square FAB background (MD3 primaryContainer) for the widget
+     "new message" button. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
+    android:shape="rectangle">
+    <corners android:radius="10dp" />
     <solid android:color="@color/widget_fab_bg" />
 </shape>

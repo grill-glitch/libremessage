@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ (API 31): the widget FAB picks up the Material You dynamic
+     accent from the wallpaper via the system color resources. -->
+<resources>
+    <color name="widget_fab_bg">@android:color/system_accent1_400</color>
+    <color name="widget_fab_icon">@android:color/system_accent1_100</color>
+</resources>

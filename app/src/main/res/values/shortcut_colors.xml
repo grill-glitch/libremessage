@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="shortcut_compose_bg">#6750A4</color>
+    <color name="shortcut_code_bg">#00696D</color>
+    <color name="shortcut_package_bg">#8B5000</color>
+</resources>

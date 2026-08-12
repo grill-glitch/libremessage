@@ -3,7 +3,7 @@
     <shortcut
         android:shortcutId="compose"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_compose"
+        android:icon="@mipmap/ic_shortcut_compose"
         android:shortcutShortLabel="@string/shortcut_compose"
         android:shortcutLongLabel="@string/shortcut_compose_long">
         <intent
@@ -14,7 +14,7 @@
     <shortcut
         android:shortcutId="codes"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_code"
+        android:icon="@mipmap/ic_shortcut_code"
         android:shortcutShortLabel="@string/shortcut_codes"
         android:shortcutLongLabel="@string/shortcut_codes_long">
         <intent
@@ -25,7 +25,7 @@
     <shortcut
         android:shortcutId="pickups"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_package"
+        android:icon="@mipmap/ic_shortcut_package"
         android:shortcutShortLabel="@string/shortcut_pickups"
         android:shortcutLongLabel="@string/shortcut_pickups_long">
         <intent

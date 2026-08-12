@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Foreground glyph (package box) for the adaptive pickup shortcut icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M63,45h-6.8v-9H42.5c-2.5,0 -4.5,2 -4.5,4.5v24.8h4.5c0,3.7 3,6.8 6.8,6.8s6.8,-3 6.8,-6.8h13.5c0,3.7 3,6.8 6.8,6.8s6.8,-3 6.8,-6.8h4.5v-11.3L63,45zM49.5,71.6c-1.9,0 -3.4,-1.5 -3.4,-3.4s1.5,-3.4 3.4,-3.4 3.4,1.5 3.4,3.4 -1.5,3.4 -3.4,3.4zM70.9,51.4l4.4,5.6h-9V51.4h4.6zM68.3,71.6c-1.9,0 -3.4,-1.5 -3.4,-3.4s1.5,-3.4 3.4,-3.4 3.4,1.5 3.4,3.4 -1.5,3.4 -3.4,3.4z" />
+</vector>

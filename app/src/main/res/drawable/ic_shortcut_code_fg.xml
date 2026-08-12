@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Foreground glyph (shield) for the adaptive code shortcut icon. -->
+<!-- Foreground glyph for the adaptive code shortcut: official Material
+     "verified_user" 24px path (positive coords), scaled into the safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,33.5L42.5,39v13.5c0,12.5 8.6,24.2 11.5,25.7 2.9,-1.5 11.5,-13.2 11.5,-25.7V39L54,33.5z" />
+    <group
+        android:translateX="30"
+        android:translateY="30"
+        android:scaleX="2"
+        android:scaleY="2">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+    </group>
 </vector>

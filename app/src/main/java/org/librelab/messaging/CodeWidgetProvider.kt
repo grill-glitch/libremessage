@@ -58,12 +58,16 @@ class CodeWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_code_merchant, context.getString(R.string.widget_no_code))
             views.setTextViewText(R.id.widget_code_value, "")
             views.setTextViewText(R.id.widget_code_body, "")
+            wireOpenApp(views, context, null)
         } else {
             views.setTextViewText(R.id.widget_code_merchant, code.merchantName)
             views.setTextViewText(R.id.widget_code_value, code.code ?: "")
             views.setTextViewText(R.id.widget_code_body, code.body)
+            // Tap the card -> app's code list (like the home banner's "view
+            // all" sheet): pickup cards open the pickup filter, the rest open
+            // the verification-code filter.
+            wireOpenApp(views, context, code)
         }
-        wireOpenApp(views, context)
         return views
     }
 
@@ -76,6 +80,7 @@ class CodeWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_tall_code, "")
             views.setTextViewText(R.id.widget_tall_body, "")
             views.setViewVisibility(R.id.widget_tall_history, android.view.View.GONE)
+            wireOpenApp(views, context, null)
         } else {
             val card = codes[0]
             views.setTextViewText(R.id.widget_tall_merchant, card.merchantName)
@@ -99,16 +104,27 @@ class CodeWidgetProvider : AppWidgetProvider() {
             } else {
                 views.setViewVisibility(R.id.widget_tall_history, android.view.View.GONE)
             }
+            wireOpenApp(views, context, card)
         }
-        wireOpenApp(views, context)
         return views
     }
 
-    private fun wireOpenApp(views: RemoteViews, context: Context) {
+    /**
+     * Card tap opens the app on the matching code list: pickup cards -> the
+     * pickup filter, verification codes -> the code filter (the widget
+     * equivalent of the home banner's "view all" sheet, which RemoteViews
+     * cannot host).
+     */
+    private fun wireOpenApp(views: RemoteViews, context: Context, card: SmsMessage?) {
+        val action = when {
+            card == null -> ""
+            card.isPickupCode -> "org.librelab.messaging.action.OPEN_PICKUPS"
+            else -> "org.librelab.messaging.action.OPEN_CODES"
+        }
         val open = PendingIntent.getActivity(
             context,
             0,
-            Intent(context, MainActivity::class.java),
+            Intent(context, MainActivity::class.java).setAction(action),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.widget_root, open)

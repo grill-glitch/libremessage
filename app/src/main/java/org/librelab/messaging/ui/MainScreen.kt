@@ -37,6 +37,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -477,6 +479,8 @@ private fun HomeScreen(
                 )
             )
         },
+        // FAB floats in the Scaffold slot (no receiver ambiguity); it hides
+        // with the bar and keeps a fixed offset above the bottom bar.
         floatingActionButton = {
             AnimatedVisibility(
                 visible = !hideChrome || selectionMode,
@@ -487,7 +491,9 @@ private fun HomeScreen(
                     onClick = { onCompose("") },
                     shape = RoundedCornerShape(18.dp),
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier
+                        .padding(bottom = 88.dp)
+                        .size(64.dp)
                 ) {
                     Icon(
                         imageVector = MaterialSymbols.Outlined.Edit,
@@ -497,67 +503,76 @@ private fun HomeScreen(
                 }
             }
         },
-        bottomBar = {
-            AnimatedVisibility(
-                visible = !hideChrome || selectionMode,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-            ) {
-                NavigationBar {
-                NavigationBarItem(
-                    selected = state.tab == 0,
-                    onClick = { vm.setTab(0) },
-                    icon = { Icon(MaterialSymbols.Outlined.Chat, contentDescription = null) },
-                    label = { Text(stringResource(R.string.tab_sms)) }
-                )
-                NavigationBarItem(
-                    selected = state.tab == 1,
-                    onClick = {
-                        vm.setTab(1)
-                        vm.loadContacts()
-                    },
-                    icon = { Icon(MaterialSymbols.Outlined.Group, contentDescription = null) },
-                    label = { Text(stringResource(R.string.tab_contacts)) }
-                )
+        // FAB + bottom bar both live inside the content column (see below):
+        // they hide/show together and the list reflows in lockstep.
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(top = innerPadding.calculateTopPadding())
+                .fillMaxSize()
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                when (state.tab) {
+                    0 -> SmsListContent(
+                        state = state,
+                        onFilter = vm::setFilter,
+                        onScrollDirection = { down -> hideChrome = down },
+                        onCopyCode = { code -> copyCode(context, code) },
+                        onOpenOriginal = { msg ->
+                            onOpenThread(SmsThreadItem(msg, 0, 1))
+                        },
+                        selectionMode = selectionMode,
+                        selectedIds = selectedIds,
+                        onToggleSelect = { t ->
+                            val id = t.message.threadId
+                            selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+                        },
+                        onLongPress = { t ->
+                            selectionMode = true
+                            selectedIds = setOf(t.message.threadId)
+                        },
+                        onRequestPermission = {
+                            permLauncher.launch(REQUIRED_PERMISSIONS)
+                        },
+                        onSetDefaultApp = onSetDefaultApp,
+                        onOpenThread = onOpenThread,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    1 -> ContactsScreen(
+                        contacts = state.contacts,
+                        onContactClick = { number -> onCompose(number) },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
-        }
-    ) { innerPadding ->
-        when (state.tab) {
-            0 -> SmsListContent(
-                state = state,
-                onFilter = vm::setFilter,
-                onScrollDirection = { down -> hideChrome = down },
-                onCopyCode = { code -> copyCode(context, code) },
-                onOpenOriginal = { msg ->
-                    onOpenThread(SmsThreadItem(msg, 0, 1))
-                },
-                selectionMode = selectionMode,
-                selectedIds = selectedIds,
-                onToggleSelect = { t ->
-                    val id = t.message.threadId
-                    selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-                },
-                onLongPress = { t ->
-                    selectionMode = true
-                    selectedIds = setOf(t.message.threadId)
-                },
-                onRequestPermission = {
-                    permLauncher.launch(REQUIRED_PERMISSIONS)
-                },
-                onSetDefaultApp = onSetDefaultApp,
-                onOpenThread = onOpenThread,
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .fillMaxSize()
-            )
-            1 -> ContactsScreen(
-                contacts = state.contacts,
-                onContactClick = { number -> onCompose(number) },
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .fillMaxSize()
-            )
+            AnimatedVisibility(
+                visible = !hideChrome || selectionMode,
+                // expand/shrink the bar's own height in sync with the slide so
+                // the weight(1f) content box above reflows up immediately —
+                // no blank strip during the hide/show animation.
+                enter = slideInVertically(initialOffsetY = { it }) +
+                    expandVertically() + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) +
+                    shrinkVertically() + fadeOut()
+            ) {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = state.tab == 0,
+                        onClick = { vm.setTab(0) },
+                        icon = { Icon(MaterialSymbols.Outlined.Chat, contentDescription = null) },
+                        label = { Text(stringResource(R.string.tab_sms)) }
+                    )
+                    NavigationBarItem(
+                        selected = state.tab == 1,
+                        onClick = {
+                            vm.setTab(1)
+                            vm.loadContacts()
+                        },
+                        icon = { Icon(MaterialSymbols.Outlined.Group, contentDescription = null) },
+                        label = { Text(stringResource(R.string.tab_contacts)) }
+                    )
+                }
+            }
         }
     }
 }

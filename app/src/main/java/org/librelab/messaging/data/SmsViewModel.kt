@@ -76,17 +76,54 @@ data class UiState(
 
     /** Messages after applying filter chip + search query. */
     val visibleMessages: List<SmsMessage>
-        get() {
-            val q = searchQuery.trim()
-            // 设置里关闭"全部标签显示广告"时,把广告从全部列表剔除
-            // (广告标签仍可单独查看)。
-            val hideAdsInAll = filter == SmsFilter.ALL && !showAdsInAll
-            return messages.filter { m ->
-                (!hideAdsInAll || m.category != MessageCategory.AD) &&
-                    filter.matches(m.category, m.body) &&
-                    (q.isEmpty() || m.body.contains(q, ignoreCase = true) || m.address.contains(q, ignoreCase = true))
-            }
+        get() = messagesFor(filter)
+
+    /**
+     * Messages for a specific filter, independent of [filter] — used by the
+     * pager pages so the content switches the instant the page settles,
+     * without waiting for the chip state to propagate.
+     */
+    fun messagesFor(f: SmsFilter): List<SmsMessage> {
+        val q = searchQuery.trim()
+        // 设置里关闭"全部标签显示广告"时,把广告从全部列表剔除
+        // (广告标签仍可单独查看)。
+        val hideAdsInAll = f == SmsFilter.ALL && !showAdsInAll
+        return messages.filter { m ->
+            (!hideAdsInAll || m.category != MessageCategory.AD) &&
+                f.matches(m.category, m.body) &&
+                (q.isEmpty() || m.body.contains(q, ignoreCase = true) || m.address.contains(q, ignoreCase = true))
         }
+    }
+
+    /**
+     * Conversation rows for one filter, grouped by thread — independent of
+     * [filter] so pager pages render instantly.
+     */
+    fun threadsFor(f: SmsFilter): List<SmsThreadItem> =
+        messagesFor(f)
+            .groupBy { if (it.threadId != 0L) it.threadId else it.address.hashCode().toLong() }
+            .values
+            .map { group ->
+                val latest = group.maxByOrNull { it.date }!!
+                SmsThreadItem(latest, group.count { !it.isRead }, group.size)
+            }
+            .sortedByDescending { it.message.date }
+
+    /** Pure verification codes (no pickup codes) — the 验证码 filter list. */
+    fun codesFor(): List<SmsMessage> =
+        messages.filter { it.category == MessageCategory.CODE }
+            .flatMap { msg ->
+                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
+            }
+            .sortedByDescending { it.date }
+
+    /** Express pickup entries for the 包裹 filter. */
+    fun pickupsFor(): List<SmsMessage> =
+        messages.filter { it.category == MessageCategory.PACKAGE }
+            .flatMap { msg ->
+                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
+            }
+            .sortedByDescending { it.date }
 
     /**
      * Conversation rows: filter at message level, then group by thread

@@ -696,7 +696,7 @@ private fun CodeFilterPage(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        val codes = state.codeEntries
+        val codes = state.codesFor()
         if (codes.isEmpty()) {
             item { EmptyBox(stringResource(R.string.empty_codes)) }
         } else {
@@ -721,7 +721,7 @@ private fun PackageFilterPage(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        val pickups = state.allPickups
+        val pickups = state.pickupsFor()
         if (pickups.isEmpty()) {
             item { EmptyBox(stringResource(R.string.empty_pickups)) }
         } else {
@@ -750,7 +750,7 @@ private fun ThreadFilterPage(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        val threads = state.visibleThreads
+        val threads = state.threadsFor(filter)
         if (threads.isEmpty()) {
             item { EmptyBox(stringResource(R.string.empty_sms)) }
         } else {

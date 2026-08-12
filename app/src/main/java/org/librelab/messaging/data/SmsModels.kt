@@ -65,6 +65,12 @@ enum class SmsFilter(@StringRes val labelRes: Int) {
 /** Delivery state of an outgoing message, driven by the sms `type` / mms `msg_box`. */
 enum class SendStatus { NONE, SENDING, SENT, FAILED }
 
+/** One active SIM card: subscription id + display name (for the picker). */
+data class SimCard(
+    val subId: Int,
+    val name: String
+)
+
 /**
  * Pending MMS attachment chosen by the user: an image (compressed to JPEG
  * on send) or any other file (sent with its original MIME type + name).

@@ -83,6 +83,11 @@
 
     <!-- Settings -->
     <string name="settings_default_app">Default SMS app</string>
+    <string name="settings_sim">Default SIM card</string>
+    <string name="settings_sim_hint">Used for outgoing messages when no SIM is picked in the conversation. None = system default.</string>
+    <string name="settings_sim_none">None (system default)</string>
+    <string name="sim_pick_title">Send with SIM card</string>
+    <string name="sim_auto">Auto (system default)</string>
     <string name="settings_default_app_active">Already the system default SMS app</string>
     <string name="settings_default_app_hint">This app can only read the system SMS database after being set as the default SMS app.</string>
     <string name="settings_ads_in_all">Show ads in All tab</string>

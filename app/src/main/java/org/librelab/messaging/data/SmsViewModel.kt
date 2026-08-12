@@ -32,7 +32,9 @@ data class UiState(
     val loading: Boolean = true,
     val showAdsInAll: Boolean = false,
     val notifyAds: Boolean = false,
-    val autoCopyCode: Boolean = true
+    val autoCopyCode: Boolean = true,
+    val defaultSubId: Int = 0,       // 0 = auto / system default SIM
+    val simCards: List<SimCard> = emptyList()
 ) {
     /** Latest code/express message pinned to the smart banner. */
     val latestCode: SmsMessage?
@@ -166,13 +168,15 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         val isDefault = runCatching {
             Telephony.Sms.getDefaultSmsPackage(app) == app.packageName
         }.getOrDefault(false)
+        loadSimCards()
         _state.update {
             it.copy(
                 hasSmsPermission = hasSms,
                 isDefaultSmsApp = isDefault,
                 showAdsInAll = repository.showAdsInAll(),
                 notifyAds = repository.notifyAds(),
-                autoCopyCode = repository.autoCopyCode()
+                autoCopyCode = repository.autoCopyCode(),
+                defaultSubId = repository.defaultSubId()
             )
         }
         if (!hasSms) {
@@ -268,6 +272,23 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     fun setAutoCopyCode(auto: Boolean) {
         repository.setAutoCopyCode(auto)
         _state.update { it.copy(autoCopyCode = auto) }
+    }
+
+    /** Enumerate active SIM cards (safe: empty list when unavailable). */
+    fun loadSimCards() {
+        val app = getApplication<Application>()
+        val cards = runCatching {
+            val sm = android.telephony.SubscriptionManager.from(app)
+            sm.activeSubscriptionInfoList.orEmpty()
+                .map { SimCard(it.subscriptionId, it.displayName?.toString() ?: "SIM ${it.simSlotIndex + 1}") }
+        }.getOrDefault(emptyList())
+        _state.update { it.copy(simCards = cards) }
+    }
+
+    /** 默认电话卡(设置项,0 = 无/系统自动)。 */
+    fun setDefaultSubId(subId: Int) {
+        repository.setDefaultSubId(subId)
+        _state.update { it.copy(defaultSubId = subId) }
     }
 
     fun setTab(tab: Int) {

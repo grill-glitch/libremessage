@@ -85,6 +85,16 @@ class SmsRepository(private val context: Context) {
             .edit().putBoolean("auto_copy_code", auto).apply()
     }
 
+    /** Default SIM subscription id for outgoing messages (0 = auto/system). */
+    fun defaultSubId(): Int =
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .getInt("default_sub_id", 0)
+
+    fun setDefaultSubId(subId: Int) {
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .edit().putInt("default_sub_id", subId).apply()
+    }
+
     /** Permanently delete a conversation (all its sms + mms rows). */
     suspend fun deleteThread(threadId: Long): Boolean = withContext(Dispatchers.IO) {
         try {

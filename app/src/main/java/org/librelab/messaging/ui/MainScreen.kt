@@ -70,6 +70,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.MaterialTheme
@@ -109,6 +111,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.librelab.messaging.R
 import org.librelab.messaging.data.SmsFilter
+import org.librelab.messaging.data.SimCard
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsThreadItem
 import kotlinx.coroutines.launch
@@ -138,6 +141,7 @@ private val REQUIRED_PERMISSIONS = arrayOf(
     Manifest.permission.RECEIVE_SMS,
     Manifest.permission.SEND_SMS,
     Manifest.permission.READ_CONTACTS,
+    Manifest.permission.READ_PHONE_STATE,
     Manifest.permission.POST_NOTIFICATIONS
 )
 
@@ -237,10 +241,13 @@ fun MainScreen(
                 showAdsInAll = s.showAdsInAll,
                 notifyAds = s.notifyAds,
                 autoCopyCode = s.autoCopyCode,
+                defaultSubId = s.defaultSubId,
+                simCards = s.simCards,
                 onSetDefaultApp = rememberSetDefaultApp(vm),
                 onToggleAdsInAll = { vm.setShowAdsInAll(it) },
                 onToggleNotifyAds = { vm.setNotifyAds(it) },
                 onToggleAutoCopyCode = { vm.setAutoCopyCode(it) },
+                onSetDefaultSubId = { vm.setDefaultSubId(it) },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -904,10 +911,13 @@ private fun SettingsScreen(
     showAdsInAll: Boolean,
     notifyAds: Boolean,
     autoCopyCode: Boolean,
+    defaultSubId: Int,
+    simCards: List<SimCard>,
     onSetDefaultApp: () -> Unit,
     onToggleAdsInAll: (Boolean) -> Unit,
     onToggleNotifyAds: (Boolean) -> Unit,
     onToggleAutoCopyCode: (Boolean) -> Unit,
+    onSetDefaultSubId: (Int) -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -956,6 +966,59 @@ private fun SettingsScreen(
                 )
                 OutlinedButton(onClick = onSetDefaultApp) {
                     Text(stringResource(R.string.action_set_default_app))
+                }
+            }
+
+            HorizontalDivider()
+
+            // 默认电话卡(发送短信用哪张卡;无 = 系统默认)
+            var simMenuOpen by remember { mutableStateOf(false) }
+            val defaultCard = simCards.firstOrNull { it.subId == defaultSubId }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_sim),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_sim_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Box {
+                    TextButton(onClick = { simMenuOpen = true }) {
+                        Text(
+                            text = defaultCard?.name ?: stringResource(R.string.settings_sim_none),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = simMenuOpen,
+                        onDismissRequest = { simMenuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_sim_none)) },
+                            onClick = {
+                                simMenuOpen = false
+                                onSetDefaultSubId(0)
+                            }
+                        )
+                        simCards.forEach { card ->
+                            DropdownMenuItem(
+                                text = { Text(card.name) },
+                                onClick = {
+                                    simMenuOpen = false
+                                    onSetDefaultSubId(card.subId)
+                                }
+                            )
+                        }
+                    }
                 }
             }
 

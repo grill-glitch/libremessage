@@ -40,7 +40,8 @@ object MmsSender {
         text: String,
         attachment: PendingAttachment,
         outboxId: Long,
-        sentIntent: android.app.PendingIntent?
+        sentIntent: android.app.PendingIntent?,
+        subId: Int = 0
     ): Long? = try {
         // 1. Build the M-Send.req PDU.
         val sendReq = SendReq()
@@ -106,8 +107,14 @@ object MmsSender {
             tmp
         )
 
-        // 4. Hand off to the telephony stack.
-        SmsManager.getDefault().sendMultimediaMessage(context, contentUri, null, null, sentIntent)
+        // 4. Hand off to the telephony stack (on the chosen SIM when one is
+        //    selected, else the system default).
+        val smsManager = if (subId > 0) {
+            SmsManager.getSmsManagerForSubscriptionId(subId)
+        } else {
+            SmsManager.getDefault()
+        }
+        smsManager.sendMultimediaMessage(context, contentUri, null, null, sentIntent)
 
         // 5. Keep our own copy so the thread keeps showing the bubble.
         val persistDir = File(context.filesDir, "mms_sent").apply { mkdirs() }

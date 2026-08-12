@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <!-- Contacts: resolve sender names / avatars -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- SIM cards: enumerate active subscriptions for the send-with-SIM picker -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- Android 13+ notification permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- MMS / cell broadcast: signature permissions. Required by the

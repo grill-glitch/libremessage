@@ -83,6 +83,11 @@
 
     <!-- Settings -->
     <string name="settings_default_app">默认短信应用</string>
+    <string name="settings_sim">默认电话卡</string>
+    <string name="settings_sim_hint">发送短信时默认使用的电话卡(在会话中未单独选择时)。无 = 系统默认。</string>
+    <string name="settings_sim_none">无(系统默认)</string>
+    <string name="sim_pick_title">使用电话卡发送</string>
+    <string name="sim_auto">自动(系统默认)</string>
     <string name="settings_default_app_active">当前已是系统默认短信应用</string>
     <string name="settings_default_app_hint">设为默认短信应用后，本应用才能读取系统短信数据库。</string>
     <string name="settings_ads_in_all">全部标签显示广告短信</string>

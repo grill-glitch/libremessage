@@ -57,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -110,6 +111,7 @@ import com.composables.icons.materialsymbols.outlined.Delete
 import com.composables.icons.materialsymbols.outlined.Deselect
 import com.composables.icons.materialsymbols.outlined.Select_all
 import com.composables.icons.materialsymbols.outlined.Share
+import com.composables.icons.materialsymbols.outlined.Sim_card
 import com.composables.icons.materialsymbols.outlined.Done_all
 import com.composables.icons.materialsymbols.outlined.Error
 import com.composables.icons.materialsymbols.outlined.File_open
@@ -121,6 +123,7 @@ import org.librelab.messaging.SmsSentReceiver
 import org.librelab.messaging.data.ContactInfo
 import org.librelab.messaging.data.PendingAttachment
 import org.librelab.messaging.data.SendStatus
+import org.librelab.messaging.data.SimCard
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.ui.theme.AvatarColor
@@ -159,6 +162,10 @@ fun ThreadDetailScreen(
     var input by remember { mutableStateOf("") }
     var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
     var viewerUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    // SIM chosen for this send (0 = follow the settings default / auto).
+    var pickedSubId by remember { mutableStateOf(0) }
+    // Effective SIM: per-send pick wins, else the settings default (0 = auto).
+    val effectiveSubId = if (pickedSubId > 0) pickedSubId else state.defaultSubId
 
     // New-thread mode: the FAB opens this screen with threadId=0. Instead of
     // a conversation, show a recipient field (auto-focused, keyboard pops)
@@ -483,7 +490,12 @@ fun ThreadDetailScreen(
                 onAttachImage = { imagePicker.launch("image/*") },
                 onAttachFile = { filePicker.launch("*/*") },
                 onRemoveAttachment = { pendingAttachment = null },
-                onSend = {
+                simCards = state.simCards,
+                defaultSubId = state.defaultSubId,
+                pickedSubId = pickedSubId,
+                onPickSim = { pickedSubId = it },
+                onSetDefaultSubId = { vm.setDefaultSubId(it) },
+                onSend = { sendSubId ->
                     val text = input.trim()
                     if (text.isEmpty() && pendingAttachment == null) return@MessageInputBar
                     if (targetAddress.isBlank()) {
@@ -496,6 +508,9 @@ fun ThreadDetailScreen(
                         Toast.makeText(context, R.string.toast_no_send_permission, Toast.LENGTH_SHORT).show()
                         return@MessageInputBar
                     }
+                    // Sub-id for this send: an explicit pick wins, else the
+                    // settings default (0 = system auto).
+                    val useSubId = if (sendSubId > 0) sendSubId else effectiveSubId
                     val attachment = pendingAttachment
                     val ok: Boolean
                     if (attachment != null) {
@@ -515,7 +530,7 @@ fun ThreadDetailScreen(
                         val scope2 = scope
                         scope2.launch(Dispatchers.IO) {
                             val sent = MmsSender.send(
-                                context, targetAddress, text, attachment, outboxId, sentIntent
+                                context, targetAddress, text, attachment, outboxId, sentIntent, useSubId
                             ) != null
                             withContext(Dispatchers.Main) {
                                 if (sent) {
@@ -551,7 +566,12 @@ fun ThreadDetailScreen(
                             PendingIntent.FLAG_IMMUTABLE
                         )
                         ok = try {
-                            SmsManager.getDefault().sendTextMessage(targetAddress, null, text, sentIntent, null)
+                            val smsManager = if (useSubId > 0) {
+                                SmsManager.getSmsManagerForSubscriptionId(useSubId)
+                            } else {
+                                SmsManager.getDefault()
+                            }
+                            smsManager.sendTextMessage(targetAddress, null, text, sentIntent, null)
                             true
                         } catch (e: Exception) {
                             vm.markSmsFailed(recordId)
@@ -1323,10 +1343,16 @@ private fun MessageInputBar(
     onAttachImage: () -> Unit,
     onAttachFile: () -> Unit,
     onRemoveAttachment: () -> Unit,
-    onSend: () -> Unit
+    onSend: (Int) -> Unit,
+    simCards: List<SimCard> = emptyList(),
+    defaultSubId: Int = 0,
+    pickedSubId: Int = 0,
+    onPickSim: (Int) -> Unit = {},
+    onSetDefaultSubId: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     var attachMenuOpen by remember { mutableStateOf(false) }
+    var simMenuOpen by remember { mutableStateOf(false) }
     Surface(
         color = MaterialTheme.colorScheme.surface,
         // The whole Scaffold rides above the keyboard (Scaffold imePadding),
@@ -1425,12 +1451,75 @@ private fun MessageInputBar(
                     }
                 }
 
-                // Pill-shaped input
+                // SIM picker: tap opens the per-send SIM chooser. Each card
+                // has a "set as default" checkbox — checking it persists the
+                // card as the settings default (same as the settings page).
+                Box {
+                    IconButton(onClick = { simMenuOpen = true }) {
+                        Icon(
+                            imageVector = MaterialSymbols.Outlined.Sim_card,
+                            contentDescription = stringResource(R.string.sim_pick_title),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = simMenuOpen,
+                        onDismissRequest = { simMenuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.sim_auto)) },
+                            leadingIcon = {
+                                Icon(MaterialSymbols.Outlined.Sim_card, contentDescription = null)
+                            },
+                            onClick = {
+                                simMenuOpen = false
+                                onPickSim(0)
+                                onSend(0)
+                            }
+                        )
+                        simCards.forEach { card ->
+                            val isDefault = card.subId == defaultSubId
+                            DropdownMenuItem(
+                                text = { Text(card.name) },
+                                leadingIcon = {
+                                    Icon(MaterialSymbols.Outlined.Sim_card, contentDescription = null)
+                                },
+                                // "Set as default" checkbox — its own click
+                                // target, separate from the item's onClick.
+                                trailingIcon = {
+                                    Checkbox(
+                                        checked = isDefault,
+                                        onCheckedChange = { checked ->
+                                            simMenuOpen = false
+                                            onSetDefaultSubId(if (checked) card.subId else 0)
+                                        }
+                                    )
+                                },
+                                onClick = {
+                                    simMenuOpen = false
+                                    onPickSim(card.subId)
+                                    onSend(card.subId)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Pill-shaped input. Long-press opens the SIM chooser when a
+                // default card is configured (so the user can override it for
+                // this send); with no default the send button asks instead.
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onLongPress = {
+                                    if (simCards.size > 1) simMenuOpen = true
+                                }
+                            )
+                        }
                 ) {
                     if (value.isEmpty()) {
                         Text(
@@ -1462,7 +1551,14 @@ private fun MessageInputBar(
                 Spacer(Modifier.width(8.dp))
 
                 FilledIconButton(
-                    onClick = onSend,
+                    // Ask which SIM to use first when none is configured:
+                    // tap sends directly once a default exists (or only one
+                    // SIM is present).
+                    onClick = {
+                        val needsPick = simCards.isNotEmpty() &&
+                            defaultSubId == 0 && pickedSubId == 0
+                        if (needsPick) simMenuOpen = true else onSend(pickedSubId)
+                    },
                     modifier = Modifier.size(48.dp),
                     shape = CircleShape,
                     colors = IconButtonDefaults.filledIconButtonColors(

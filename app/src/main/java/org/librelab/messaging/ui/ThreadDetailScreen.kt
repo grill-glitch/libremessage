@@ -589,30 +589,36 @@ fun ThreadDetailScreen(
             if (isNewThread) {
                 // Contact picker below the top bar (the recipient field
                 // itself lives in the bar); filters by the typed query and
-                // shows all contacts A-Z when empty.
-                LazyColumn(
+                // shows all contacts A-Z when empty. The whole picker sits in
+                // one rounded-rectangle surface.
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 220.dp)
                 ) {
-                    if (filteredContacts.isEmpty()) {
-                        item {
-                            Text(
-                                text = stringResource(R.string.empty_contact_match),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                    } else {
-                        items(filteredContacts, key = { (it.number ?: "") + it.name }) { contact ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { contact.number?.let { newNumber = it } }
-                                    .padding(vertical = 8.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                    LazyColumn(
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        if (filteredContacts.isEmpty()) {
+                            item {
+                                Text(
+                                    text = stringResource(R.string.empty_contact_match),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 14.dp)
+                                )
+                            }
+                        } else {
+                            items(filteredContacts, key = { (it.number ?: "") + it.name }) { contact ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { contact.number?.let { newNumber = it } }
+                                        .padding(vertical = 12.dp, horizontal = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                 Text(
                                     text = contact.name,
                                     style = MaterialTheme.typography.bodyLarge,
@@ -628,6 +634,7 @@ fun ThreadDetailScreen(
                             }
                         }
                     }
+                }
                 }
             }
             LazyColumn(

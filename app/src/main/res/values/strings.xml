@@ -45,6 +45,10 @@
     <string name="action_save_image">Save image</string>
     <string name="action_remove_image">Remove image</string>
     <string name="action_attach">Attach</string>
+    <string name="action_attach_image">Image</string>
+    <string name="action_attach_file">File</string>
+    <string name="file_attachment">File attachment</string>
+    <string name="pending_file">Pending file</string>
     <string name="action_grant">Grant</string>
     <string name="action_go_settings">Open settings</string>
     <string name="action_set_default_app">Set as default SMS app</string>
@@ -95,6 +99,7 @@
     <string name="toast_saved_to_gallery">Saved to gallery</string>
     <string name="toast_save_failed">Save failed</string>
     <string name="toast_sms_sent">Message sent</string>
+    <string name="toast_sms_empty">Enter a message or attach a file</string>
     <string name="toast_send_failed">Send failed: %1$s</string>
     <string name="toast_mms_failed">MMS send failed</string>
     <string name="toast_mms_data_required">MMS send failed: allow MMS data connection and retry</string>

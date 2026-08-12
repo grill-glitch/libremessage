@@ -113,13 +113,16 @@ private data class ComposeTarget(val number: String, val body: String)
 private object HomeRoute
 
 @kotlinx.serialization.Serializable
-private data class ThreadRoute(val threadId: Long, val address: String, val sender: String)
+private data class ThreadRoute(
+    val threadId: Long,
+    val address: String,
+    val sender: String,
+    val attachmentUri: String = "",
+    val body: String = ""
+)
 
 @kotlinx.serialization.Serializable
 private object SettingsRoute
-
-@kotlinx.serialization.Serializable
-private data class ComposeRoute(val number: String = "", val body: String = "")
 
 private val REQUIRED_PERMISSIONS = arrayOf(
     Manifest.permission.READ_SMS,
@@ -134,15 +137,18 @@ private val REQUIRED_PERMISSIONS = arrayOf(
 fun MainScreen(
     vm: SmsViewModel = viewModel(),
     initialNumber: String = "",
-    initialBody: String = ""
+    initialBody: String = "",
+    initialAttachmentUri: String = ""
 ) {
     val navController = rememberNavController()
 
-    // Deep-link: launch straight into the compose screen when the activity
-    // was started with a number/body (e.g. share intent).
+    // Deep-link: launch straight into a new-conversation draft when the
+    // activity was started with a number/body/attachment (share intent).
     LaunchedEffect(Unit) {
-        if (initialNumber.isNotBlank() || initialBody.isNotBlank()) {
-            navController.navigate(ComposeRoute(initialNumber, initialBody))
+        if (initialNumber.isNotBlank() || initialBody.isNotBlank() || initialAttachmentUri.isNotBlank()) {
+            navController.navigate(
+                ThreadRoute(0L, initialNumber, "", initialAttachmentUri, initialBody)
+            )
         }
     }
 
@@ -208,6 +214,8 @@ fun MainScreen(
                 threadId = route.threadId,
                 address = route.address,
                 sender = route.sender,
+                initialAttachmentUri = route.attachmentUri,
+                initialBody = route.body,
                 vm = vm,
                 onBack = { navController.popBackStack() }
             )
@@ -224,15 +232,6 @@ fun MainScreen(
                 onToggleAdsInAll = { vm.setShowAdsInAll(it) },
                 onToggleNotifyAds = { vm.setNotifyAds(it) },
                 onToggleAutoCopyCode = { vm.setAutoCopyCode(it) },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable<ComposeRoute> { entry ->
-            val route = entry.toRoute<ComposeRoute>()
-            ComposeMessageScreen(
-                initialNumber = route.number,
-                initialBody = route.body,
                 onBack = { navController.popBackStack() }
             )
         }

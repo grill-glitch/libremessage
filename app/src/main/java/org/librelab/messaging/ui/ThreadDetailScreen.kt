@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -111,11 +112,14 @@ import com.composables.icons.materialsymbols.outlined.Select_all
 import com.composables.icons.materialsymbols.outlined.Share
 import com.composables.icons.materialsymbols.outlined.Done_all
 import com.composables.icons.materialsymbols.outlined.Error
+import com.composables.icons.materialsymbols.outlined.File_open
+import com.composables.icons.materialsymbols.outlined.Image
 import com.composables.icons.materialsymbols.outlined.More_vert
 import com.composables.icons.materialsymbols.outlined.Send
 import org.librelab.messaging.R
 import org.librelab.messaging.SmsSentReceiver
 import org.librelab.messaging.data.ContactInfo
+import org.librelab.messaging.data.PendingAttachment
 import org.librelab.messaging.data.SendStatus
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsViewModel
@@ -142,7 +146,9 @@ fun ThreadDetailScreen(
     address: String,
     sender: String,
     vm: SmsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    initialAttachmentUri: String = "",
+    initialBody: String = ""
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val messages = state.threadMessages
@@ -151,7 +157,7 @@ fun ThreadDetailScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var input by remember { mutableStateOf("") }
-    var pendingImage by remember { mutableStateOf<File?>(null) }
+    var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
     var viewerUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     // New-thread mode: the FAB opens this screen with threadId=0. Instead of
@@ -169,6 +175,28 @@ fun ThreadDetailScreen(
         if (isNewThread) {
             vm.loadContacts()
             numberFocus.requestFocus()
+            // Share intents: prefill the text body and/or attachment.
+            if (initialBody.isNotBlank()) input = initialBody
+            if (initialAttachmentUri.isNotBlank()) {
+                runCatching {
+                    val uri = android.net.Uri.parse(initialAttachmentUri)
+                    val name = uri.getQueryParameter("display_name")
+                        ?: uri.lastPathSegment?.substringAfterLast('/')
+                        ?: "file"
+                    val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                    val ext = name.substringAfterLast('.', "").lowercase()
+                    val file = File(context.cacheDir, "pending_mms_${System.currentTimeMillis()}.$ext")
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        file.outputStream().use { input.copyTo(it) }
+                    }
+                    pendingAttachment = PendingAttachment(
+                        file, name, mime,
+                        isImage = mime.startsWith("image/")
+                    )
+                }.onFailure {
+                    Toast.makeText(context, R.string.toast_read_image_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
     val filteredContacts = remember(newNumber, contacts) {
@@ -205,7 +233,26 @@ fun ThreadDetailScreen(
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
-                pendingImage = file
+                pendingAttachment = PendingAttachment(file, "IMG.jpg", "image/jpeg", isImage = true)
+            } catch (e: Exception) {
+                Toast.makeText(context, R.string.toast_read_image_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            try {
+                val name = uri.getQueryParameter("display_name")
+                    ?: uri.lastPathSegment?.substringAfterLast('/')
+                    ?: "file"
+                val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                val ext = name.substringAfterLast('.', "").lowercase()
+                val file = File(context.cacheDir, "pending_mms_${System.currentTimeMillis()}.$ext")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { input.copyTo(it) }
+                }
+                pendingAttachment = PendingAttachment(file, name, mime, isImage = false)
             } catch (e: Exception) {
                 Toast.makeText(context, R.string.toast_read_image_failed, Toast.LENGTH_SHORT).show()
             }
@@ -272,7 +319,11 @@ fun ThreadDetailScreen(
                                 .focusRequester(numberFocus)
                         )
                     } else {
-                        val titleText = if (isNewThread) newNumber else sender.ifBlank { address }
+                        // After the first send from a share intent the thread
+                        // id flips to the real one; fall back through sender →
+                        // address → the number the user actually typed.
+                        val titleText = if (isNewThread) newNumber
+                        else sender.ifBlank { address }.ifBlank { newNumber }
                         val ac = avatarColorFor(titleText)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             InitialAvatar(
@@ -428,12 +479,13 @@ fun ThreadDetailScreen(
                 value = input,
                 onValueChange = { input = it },
                 onFocusChanged = { inputFocused = it },
-                pendingImage = pendingImage,
-                onAttach = { imagePicker.launch("image/*") },
-                onRemoveImage = { pendingImage = null },
+                pendingAttachment = pendingAttachment,
+                onAttachImage = { imagePicker.launch("image/*") },
+                onAttachFile = { filePicker.launch("*/*") },
+                onRemoveAttachment = { pendingAttachment = null },
                 onSend = {
                     val text = input.trim()
-                                    if (text.isEmpty() && pendingImage == null) return@MessageInputBar
+                    if (text.isEmpty() && pendingAttachment == null) return@MessageInputBar
                     if (targetAddress.isBlank()) {
                         Toast.makeText(context, R.string.toast_enter_recipient, Toast.LENGTH_SHORT).show()
                         return@MessageInputBar
@@ -444,9 +496,9 @@ fun ThreadDetailScreen(
                         Toast.makeText(context, R.string.toast_no_send_permission, Toast.LENGTH_SHORT).show()
                         return@MessageInputBar
                     }
-                    val image = pendingImage
+                    val attachment = pendingAttachment
                     val ok: Boolean
-                    if (image != null) {
+                    if (attachment != null) {
                         // MMS: keep our own outbox copy; the sent callback flips
                         // it to FAILED if the stack reports an error. Runs off
                         // the UI thread because MMS data may need enabling first.
@@ -462,10 +514,12 @@ fun ThreadDetailScreen(
                         )
                         val scope2 = scope
                         scope2.launch(Dispatchers.IO) {
-                            val sent = MmsSender.send(context, targetAddress, text, image, outboxId, sentIntent) != null
+                            val sent = MmsSender.send(
+                                context, targetAddress, text, attachment, outboxId, sentIntent
+                            ) != null
                             withContext(Dispatchers.Main) {
                                 if (sent) {
-                                    pendingImage = null
+                                    pendingAttachment = null
                                     input = ""
                                     if (currentThreadId == 0L) {
                                         val realId = Telephony.Threads.getOrCreateThreadId(context, targetAddress)
@@ -510,7 +564,7 @@ fun ThreadDetailScreen(
                         }
                     }
                     if (ok) {
-                        pendingImage = null
+                        pendingAttachment = null
                         input = ""
                         if (currentThreadId == 0L) {
                             // First send from new-thread mode: resolve the
@@ -522,8 +576,6 @@ fun ThreadDetailScreen(
                             vm.openThread(realId)
                         }
                         vm.refresh() // ContentObserver also fires; refresh re-loads the thread
-                    } else if (image != null) {
-                        Toast.makeText(context, R.string.toast_mms_failed, Toast.LENGTH_SHORT).show()
                     }
                 }
             )
@@ -834,7 +886,7 @@ private fun MessageBubble(
     onDelete: (SmsMessage) -> Unit
 ) {
     val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.date))
-    val hasImages = message.imageUris.isNotEmpty()
+    val hasImages = message.imageUris.isNotEmpty() || message.attachmentName != null
     var confirmDelete by remember { mutableStateOf(false) }
     if (message.isSent) {
         // Sent — right aligned; images sit outside the bubble, bubble holds text+time
@@ -844,6 +896,18 @@ private fun MessageBubble(
             verticalAlignment = Alignment.Bottom
         ) {
             Column(horizontalAlignment = Alignment.End) {
+                // File attachment: show a file card (name + icon) instead of
+                // the image viewer path.
+                if (message.attachmentName != null) {
+                    FileAttachmentCard(
+                        name = message.attachmentName,
+                        message = message,
+                        onRequestDelete = { confirmDelete = true },
+                        multiSelect = multiSelect,
+                        selected = selected,
+                        onToggle = { onToggleSelect(message.key) }
+                    )
+                }
                 message.imageUris.forEach { uri ->
                     MmsImage(
                         uri,
@@ -907,6 +971,16 @@ private fun MessageBubble(
             )
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.Start) {
+                if (message.attachmentName != null) {
+                    FileAttachmentCard(
+                        name = message.attachmentName,
+                        message = message,
+                        onRequestDelete = { confirmDelete = true },
+                        multiSelect = multiSelect,
+                        selected = selected,
+                        onToggle = { onToggleSelect(message.key) }
+                    )
+                }
                 message.imageUris.forEach { uri ->
                     MmsImage(
                         uri,
@@ -1021,6 +1095,67 @@ private fun MmsImage(
                 onRequestDelete = onRequestDelete
             )
         }
+    }
+}
+
+/** File attachment bubble card: icon + file name, tap to open. */
+@Composable
+private fun FileAttachmentCard(
+    name: String,
+    message: SmsMessage,
+    onRequestDelete: () -> Unit,
+    multiSelect: Boolean = false,
+    selected: Boolean = false,
+    onToggle: () -> Unit = {}
+) {
+    var menuAt by remember { mutableStateOf<Offset?>(null) }
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
+        },
+        modifier = Modifier
+            .padding(bottom = 6.dp)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { if (multiSelect) onToggle() else menuAt = Offset(0f, 0f) },
+                    onLongPress = { if (multiSelect) onToggle() else menuAt = it }
+                )
+            }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Icon(
+                imageVector = MaterialSymbols.Outlined.File_open,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 200.dp)
+            )
+        }
+    }
+    menuAt?.let {
+        MessageActionMenu(
+            offset = it,
+            message = message,
+            hasImages = false,
+            onDismiss = { menuAt = null },
+            onSaveImage = {},
+            onStartMultiSelect = { onToggle() },
+            onRequestDelete = onRequestDelete
+        )
     }
 }
 
@@ -1177,12 +1312,14 @@ private fun MessageInputBar(
     value: String,
     onValueChange: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
-    pendingImage: File?,
-    onAttach: () -> Unit,
-    onRemoveImage: () -> Unit,
+    pendingAttachment: PendingAttachment?,
+    onAttachImage: () -> Unit,
+    onAttachFile: () -> Unit,
+    onRemoveAttachment: () -> Unit,
     onSend: () -> Unit
 ) {
     val context = LocalContext.current
+    var attachMenuOpen by remember { mutableStateOf(false) }
     Surface(
         color = MaterialTheme.colorScheme.surface,
         // The whole Scaffold rides above the keyboard (Scaffold imePadding),
@@ -1191,28 +1328,47 @@ private fun MessageInputBar(
     ) {
         Column {
             // Pending attachment preview
-            if (pendingImage != null) {
+            if (pendingAttachment != null) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AsyncImage(
-                        model = pendingImage,
-                        contentDescription = stringResource(R.string.pending_image),
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
+                    if (pendingAttachment.isImage) {
+                        AsyncImage(
+                            model = pendingAttachment.file,
+                            contentDescription = stringResource(R.string.pending_image),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    } else {
+                        // File attachment: icon + name instead of a thumbnail.
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.File_open,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text = stringResource(R.string.image_attachment),
+                        text = pendingAttachment.name,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onRemoveImage) {
+                    IconButton(onClick = onRemoveAttachment) {
                         Icon(
                             MaterialSymbols.Outlined.Close,
                             contentDescription = stringResource(R.string.action_remove_image),
@@ -1227,12 +1383,39 @@ private fun MessageInputBar(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onAttach) {
-                    Icon(
-                        MaterialSymbols.Outlined.Attach_file,
-                        contentDescription = stringResource(R.string.action_attach),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Box {
+                    IconButton(onClick = { attachMenuOpen = true }) {
+                        Icon(
+                            MaterialSymbols.Outlined.Attach_file,
+                            contentDescription = stringResource(R.string.action_attach),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = attachMenuOpen,
+                        onDismissRequest = { attachMenuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_attach_image)) },
+                            leadingIcon = {
+                                Icon(MaterialSymbols.Outlined.Image, contentDescription = null)
+                            },
+                            onClick = {
+                                attachMenuOpen = false
+                                onAttachImage()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_attach_file)) },
+                            leadingIcon = {
+                                Icon(MaterialSymbols.Outlined.File_open, contentDescription = null)
+                            },
+                            onClick = {
+                                attachMenuOpen = false
+                                onAttachFile()
+                            }
+                        )
+                    }
                 }
 
                 // Pill-shaped input

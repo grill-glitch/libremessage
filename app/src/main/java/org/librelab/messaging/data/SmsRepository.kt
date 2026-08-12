@@ -174,6 +174,7 @@ class SmsRepository(private val context: Context) {
                 contactName = contact?.name,
                 isMms = true,
                 imageUris = if (imageFile.exists()) listOf(Uri.fromFile(imageFile)) else emptyList(),
+                attachmentName = r.name,
                 sendStatus = if (r.failed) SendStatus.FAILED else SendStatus.SENT
             )
         }

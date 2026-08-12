@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.Telephony
 import android.telephony.SmsManager
 import androidx.core.content.FileProvider
+import org.librelab.messaging.data.PendingAttachment
 import org.librelab.messaging.mms.pdu.EncodedStringValue
 import org.librelab.messaging.mms.pdu.PduBody
 import org.librelab.messaging.mms.pdu.PduComposer
@@ -15,11 +16,12 @@ import org.librelab.messaging.mms.pdu.SendReq
 import java.io.File
 
 /**
- * Sends an MMS (text + one image). The PDU is encoded with the AOSP
- * com.google.android.mms.pdu library (same one the system Messaging app
- * uses), written to a FileProvider temp file, and handed to the telephony
- * stack via SmsManager.sendMultimediaMessage. The stack reads the PDU
- * bytes from the provider uri — it cannot open content://mms rows.
+ * Sends an MMS (text + one attachment: image or any file). The PDU is
+ * encoded with the AOSP com.google.android.mms.pdu library (same one the
+ * system Messaging app uses), written to a FileProvider temp file, and
+ * handed to the telephony stack via SmsManager.sendMultimediaMessage. The
+ * stack reads the PDU bytes from the provider uri — it cannot open
+ * content://mms rows.
  *
  * We keep our own copy in [OutboxStore] to render the sent bubble; the
  * sent PendingIntent flips that copy between SENT and FAILED.
@@ -36,7 +38,7 @@ object MmsSender {
         context: Context,
         number: String,
         text: String,
-        imageFile: File,
+        attachment: PendingAttachment,
         outboxId: Long,
         sentIntent: android.app.PendingIntent?
     ): Long? = try {
@@ -50,11 +52,18 @@ object MmsSender {
 
         val body = PduBody()
 
-        // SMIL layout part (required for image presentation).
-        val smil = ("<smil><head><layout><root-layout width=\"320px\" height=\"480px\"/>" +
-            "<region id=\"Image\" left=\"0\" top=\"0\" width=\"320px\" height=\"480px\" fit=\"meet\"/>" +
-            "</layout></head><body><par dur=\"5000ms\"><img src=\"IMG.jpg\" region=\"Image\"/>" +
-            "</par></body></smil>")
+        // SMIL layout part (required for media presentation).
+        val smil = if (attachment.isImage) {
+            ("<smil><head><layout><root-layout width=\"320px\" height=\"480px\"/>" +
+                "<region id=\"Image\" left=\"0\" top=\"0\" width=\"320px\" height=\"480px\" fit=\"meet\"/>" +
+                "</layout></head><body><par dur=\"5000ms\"><img src=\"IMG.jpg\" region=\"Image\"/>" +
+                "</par></body></smil>")
+        } else {
+            // Non-image files are presented as attachments; the viewer shows
+            // the name + MIME rather than rendering media inline.
+            ("<smil><head><layout><root-layout width=\"320px\" height=\"480px\"/>" +
+                "</layout></head><body><par dur=\"5000ms\"/></body></smil>")
+        }
         val smilPart = PduPart()
         smilPart.setContentType("application/smil".toByteArray())
         smilPart.setName("smil.xml".toByteArray())
@@ -69,13 +78,18 @@ object MmsSender {
             body.addPart(textPart)
         }
 
-        val imgBytes = imageFile.readBytes()
-        val imgPart = PduPart()
-        imgPart.setContentType("image/jpeg".toByteArray())
-        imgPart.setFilename("IMG.jpg".toByteArray())
-        imgPart.setName("IMG.jpg".toByteArray())
-        imgPart.setData(imgBytes)
-        body.addPart(imgPart)
+        // Attachment part: images are re-encoded as JPEG (MMS size limits);
+        // files keep their original bytes and MIME type.
+        val attachPart = PduPart()
+        attachPart.setContentType(attachment.mime.toByteArray())
+        attachPart.setFilename(attachment.name.toByteArray())
+        attachPart.setName(attachment.name.toByteArray())
+        if (attachment.isImage) {
+            attachPart.setData(imageBytes(attachment.file))
+        } else {
+            attachPart.setData(attachment.file.readBytes())
+        }
+        body.addPart(attachPart)
         sendReq.setBody(body)
 
         // 2. Encode the PDU (WAP binary).
@@ -97,8 +111,15 @@ object MmsSender {
 
         // 5. Keep our own copy so the thread keeps showing the bubble.
         val persistDir = File(context.filesDir, "mms_sent").apply { mkdirs() }
-        val savedImage = File(persistDir, "mms_${System.currentTimeMillis()}.jpg")
-        compressImage(imageFile, savedImage)
+        val savedFile = if (attachment.isImage) {
+            val savedImage = File(persistDir, "mms_${System.currentTimeMillis()}.jpg")
+            compressImage(attachment.file, savedImage)
+            savedImage
+        } else {
+            val saved = File(persistDir, "mms_${System.currentTimeMillis()}_${attachment.name}")
+            attachment.file.copyTo(saved, overwrite = true)
+            saved
+        }
         val threadId = Telephony.Threads.getOrCreateThreadId(context, number)
         OutboxStore.add(
             context,
@@ -107,15 +128,43 @@ object MmsSender {
                 threadId = threadId,
                 address = number,
                 text = text,
-                imagePath = savedImage.absolutePath,
+                imagePath = savedFile.absolutePath,
                 date = System.currentTimeMillis(),
-                failed = false
+                failed = false,
+                name = attachment.name,
+                mime = attachment.mime
             )
         )
         outboxId
     } catch (e: Exception) {
         android.util.Log.e("MmsSender", "send failed", e)
         null
+    }
+
+    /** Downscale to MAX_DIMENSION and re-encode as JPEG (MMS size limits). */
+    private fun imageBytes(src: File): ByteArray {
+        val bmp = BitmapFactory.decodeFile(src.absolutePath) ?: return src.readBytes()
+        val w = bmp.width
+        val h = bmp.height
+        val scale = minOf(1f, MAX_DIMENSION.toFloat() / maxOf(w, h))
+        val out = if (scale < 1f) {
+            Bitmap.createScaledBitmap(
+                bmp,
+                (w * scale).toInt().coerceAtLeast(1),
+                (h * scale).toInt().coerceAtLeast(1),
+                true
+            )
+        } else {
+            bmp
+        }
+        return try {
+            val bos = java.io.ByteArrayOutputStream()
+            out.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, bos)
+            bos.toByteArray()
+        } finally {
+            if (out !== bmp) out.recycle()
+            bmp.recycle()
+        }
     }
 
     /** Downscale to MAX_DIMENSION and re-encode as JPEG (MMS size limits). */

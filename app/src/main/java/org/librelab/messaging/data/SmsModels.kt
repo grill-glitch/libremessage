@@ -12,6 +12,7 @@ import com.composables.icons.materialsymbols.outlined.Notifications
 import com.composables.icons.materialsymbols.outlined.Person
 import com.composables.icons.materialsymbols.outlined.Shield
 import org.librelab.messaging.R
+import java.io.File
 
 /** Category assigned by [SmsParser] to every real message. */
 enum class MessageCategory {
@@ -64,6 +65,17 @@ enum class SmsFilter(@StringRes val labelRes: Int) {
 /** Delivery state of an outgoing message, driven by the sms `type` / mms `msg_box`. */
 enum class SendStatus { NONE, SENDING, SENT, FAILED }
 
+/**
+ * Pending MMS attachment chosen by the user: an image (compressed to JPEG
+ * on send) or any other file (sent with its original MIME type + name).
+ */
+data class PendingAttachment(
+    val file: File,
+    val name: String,
+    val mime: String,
+    val isImage: Boolean
+)
+
 /** One real SMS row read from the Telephony provider. */
 data class SmsMessage(
     val id: Long,
@@ -78,6 +90,7 @@ data class SmsMessage(
     val contactName: String?, // matched contact display name, if any
     val isMms: Boolean = false,          // true = MMS message
     val imageUris: List<Uri> = emptyList(), // MMS image parts (content://mms/part/...)
+    val attachmentName: String? = null,    // MMS file attachment display name
     val sendStatus: SendStatus = SendStatus.NONE // outgoing delivery state
 ) {
     val sender: String get() = contactName?.takeIf { it.isNotBlank() } ?: address

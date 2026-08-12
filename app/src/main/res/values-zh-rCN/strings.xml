@@ -45,6 +45,10 @@
     <string name="action_save_image">保存图片</string>
     <string name="action_remove_image">移除图片</string>
     <string name="action_attach">附件</string>
+    <string name="action_attach_image">图片</string>
+    <string name="action_attach_file">文件</string>
+    <string name="file_attachment">文件附件</string>
+    <string name="pending_file">待发送文件</string>
     <string name="action_grant">授权</string>
     <string name="action_go_settings">去设置</string>
     <string name="action_set_default_app">设为默认短信应用</string>
@@ -95,6 +99,7 @@
     <string name="toast_saved_to_gallery">已保存到相册</string>
     <string name="toast_save_failed">保存失败</string>
     <string name="toast_sms_sent">短信已发送</string>
+    <string name="toast_sms_empty">请输入内容或选择附件</string>
     <string name="toast_send_failed">发送失败: %1$s</string>
     <string name="toast_mms_failed">彩信发送失败</string>
     <string name="toast_mms_data_required">彩信发送失败: 请允许 MMS 数据连接后重试</string>

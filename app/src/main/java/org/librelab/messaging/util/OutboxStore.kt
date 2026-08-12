@@ -18,7 +18,9 @@ data class OutboxMms(
     val text: String,
     val imagePath: String,
     val date: Long,
-    val failed: Boolean
+    val failed: Boolean,
+    val name: String? = null, // attachment display name (files)
+    val mime: String? = null // attachment MIME (files)
 )
 
 object OutboxStore {
@@ -41,6 +43,8 @@ object OutboxStore {
                     .put("imagePath", r.imagePath)
                     .put("date", r.date)
                     .put("failed", r.failed)
+                    .put("name", r.name ?: "")
+                    .put("mime", r.mime ?: "")
             )
         }
         try {
@@ -64,7 +68,9 @@ object OutboxStore {
                     text = o.optString("text", ""),
                     imagePath = o.optString("imagePath", ""),
                     date = o.getLong("date"),
-                    failed = o.optBoolean("failed", false)
+                    failed = o.optBoolean("failed", false),
+                    name = o.optString("name", "").ifBlank { null },
+                    mime = o.optString("mime", "").ifBlank { null }
                 )
             }
         } catch (e: Exception) {

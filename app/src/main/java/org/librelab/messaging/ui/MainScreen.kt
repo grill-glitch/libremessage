@@ -735,7 +735,9 @@ private fun AllFilterPage(
                 onOpenOriginal = onOpenOriginal
             )
         }
-        val threads = state.visibleThreads
+        // ALL = the default filter; compute directly so the page renders the
+        // instant it settles, without waiting for chip state to propagate.
+        val threads = state.threadsFor(SmsFilter.ALL)
         if (threads.isEmpty()) {
             item { EmptyBox(stringResource(R.string.empty_sms)) }
         } else {

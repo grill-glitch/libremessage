@@ -20,7 +20,8 @@ class MainActivity : ComponentActivity() {
         val number: String,
         val body: String,
         val attachmentUri: String,
-        val shortcutTarget: Int
+        val shortcutTarget: Int,
+        val threadId: Long = -1L
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +34,8 @@ class MainActivity : ComponentActivity() {
                     initialNumber = p.number,
                     initialBody = p.body,
                     initialAttachmentUri = p.attachmentUri,
-                    shortcutTarget = p.shortcutTarget
+                    shortcutTarget = p.shortcutTarget,
+                    initialThreadId = p.threadId
                 )
             }
         }
@@ -50,7 +52,8 @@ class MainActivity : ComponentActivity() {
                     initialNumber = p.number,
                     initialBody = p.body,
                     initialAttachmentUri = p.attachmentUri,
-                    shortcutTarget = p.shortcutTarget
+                    shortcutTarget = p.shortcutTarget,
+                    initialThreadId = p.threadId
                 )
             }
         }
@@ -60,13 +63,18 @@ class MainActivity : ComponentActivity() {
         val number = intent.data?.schemeSpecificPart.orEmpty()
         var body = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
         var attachmentUri = ""
+        // Widget row tap: open that specific conversation.
+        val widgetThreadId = intent.getLongExtra("threadId", -1L)
         // Launcher long-press shortcuts: 0 = none, 1 = new message,
         // 2 = verification codes filter, 3 = pickup codes filter.
-        val shortcutTarget = when (intent.action) {
-            "org.librelab.messaging.action.NEW_MESSAGE" -> 1
-            "org.librelab.messaging.action.OPEN_CODES" -> 2
-            "org.librelab.messaging.action.OPEN_PICKUPS" -> 3
+        val shortcutTarget = when {
+            intent.action == "org.librelab.messaging.action.NEW_MESSAGE" -> 1
+            intent.action == "org.librelab.messaging.action.OPEN_CODES" -> 2
+            intent.action == "org.librelab.messaging.action.OPEN_PICKUPS" -> 3
             else -> 0
+        }
+        if (widgetThreadId > 0 && shortcutTarget == 0) {
+            return LaunchParams(number = "", body = "", attachmentUri = "", shortcutTarget = 4, threadId = widgetThreadId)
         }
 
         if (intent.action == Intent.ACTION_SEND) {

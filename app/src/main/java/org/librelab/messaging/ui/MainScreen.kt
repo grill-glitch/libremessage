@@ -152,14 +152,15 @@ fun MainScreen(
     initialNumber: String = "",
     initialBody: String = "",
     initialAttachmentUri: String = "",
-    shortcutTarget: Int = 0
+    shortcutTarget: Int = 0,
+    initialThreadId: Long = -1L
 ) {
     val navController = rememberNavController()
 
     // Deep-link: launch straight into a new-conversation draft when the
     // activity was started with a number/body/attachment (share intent),
     // or into the matching filter tab via a launcher shortcut (2 = codes,
-    // 3 = pickups).
+    // 3 = pickups), or a specific thread from a widget row tap (4).
     LaunchedEffect(Unit) {
         if (shortcutTarget == 1 ||
             initialNumber.isNotBlank() || initialBody.isNotBlank() || initialAttachmentUri.isNotBlank()
@@ -171,6 +172,8 @@ fun MainScreen(
             vm.setFilter(SmsFilter.CODE)
         } else if (shortcutTarget == 3) {
             vm.setFilter(SmsFilter.PACKAGE)
+        } else if (shortcutTarget == 4 && initialThreadId > 0) {
+            navController.navigate(ThreadRoute(initialThreadId, "", ""))
         }
     }
 

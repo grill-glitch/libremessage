@@ -5,4 +5,6 @@
     <color name="widget_text_secondary">#9E9789</color>
     <color name="widget_text_accent">#C8A96A</color>
     <color name="widget_divider">#3A352C</color>
+    <color name="widget_avatar_bg">#3A352C</color>
+    <color name="widget_fab_bg">#C8A96A</color>
 </resources>

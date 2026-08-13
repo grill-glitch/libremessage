@@ -15,12 +15,13 @@ import android.widget.RemoteViews
  * Home-screen widget listing the most recent conversations, mirroring the
  * app's home list (contact name + last message + time).
  *
- * Uses FIXED rows (not a ListView): some launchers drop the fill-in extras
- * of ListView items, which would land taps on the home screen instead of
- * the thread. Each fixed row carries its own click PendingIntent with the
- * thread id in the extras.
+ * Uses FIXED rows (not a ListView): crDroid's launcher intercepts every
+ * touch on ListView items — fill-in extras are dropped and per-row click
+ * intents are never delivered — but ordinary views get their own reliable
+ * click PendingIntent. Each fixed row therefore carries its own click
+ * PendingIntent with the thread id in the extras.
  *
- * Tapping a row opens that thread in the app; the header opens the app;
+ * Tapping a row opens that thread; the header / "more" link opens the app;
  * the bottom-right FAB starts a new message.
  */
 class ListWidgetProvider : AppWidgetProvider() {
@@ -35,10 +36,15 @@ class ListWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.widget_list)
         val threads = loadThreads(context)
 
-        // Header tap -> open the app (no action = plain launch).
+        // Header tap -> open the app.
         views.setOnClickPendingIntent(
             R.id.widget_list_header,
             openApp(context, 0, "", -1L)
+        )
+        // "More" link -> open the app.
+        views.setOnClickPendingIntent(
+            R.id.widget_list_more,
+            openApp(context, 2, "", -1L)
         )
 
         // FAB -> new-message draft (same action as the launcher shortcut).
@@ -127,6 +133,8 @@ class ListWidgetProvider : AppWidgetProvider() {
                 ComponentName(context, ListWidgetProvider::class.java)
             )
             if (ids.isNotEmpty()) {
+                // Rebuild the full RemoteViews (re-attaches the per-row click
+                // PendingIntents).
                 ListWidgetProvider().onUpdate(context, manager, ids)
             }
         }

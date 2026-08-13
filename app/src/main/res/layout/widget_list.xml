@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Message-list widget: header + fixed conversation rows + new-message FAB.
-     Fixed rows (no scrollable list) so each row carries its own click
-     PendingIntent — some launchers drop fill-in extras on list items. -->
+     Fixed rows (no scrollable list) — crDroid's launcher intercepts every
+     touch on ListView items (fill-in extras dropped, per-row click intents
+     never delivered), so each row carries its own click PendingIntent and
+     the list is a fixed set of the latest conversations. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -39,6 +41,19 @@
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:textColor="@color/widget_text_primary" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/widget_list_more"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_list_more"
+                android:textSize="11sp"
+                android:textColor="@color/widget_text_accent" />
         </LinearLayout>
 
         <View

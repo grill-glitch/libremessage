@@ -8,16 +8,16 @@
     android:gravity="center_vertical"
     android:paddingStart="12dp"
     android:paddingEnd="12dp"
-    android:paddingTop="7dp"
-    android:paddingBottom="7dp">
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
 
     <!-- Avatar -->
     <TextView
         android:id="@+id/widget_row4_avatar"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
         android:gravity="center"
-        android:textSize="15sp"
+        android:textSize="13sp"
         android:textStyle="bold"
         android:textColor="@color/widget_text_primary"
         android:background="@drawable/widget_avatar_bg" />

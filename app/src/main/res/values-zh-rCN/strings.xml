@@ -100,6 +100,7 @@
     <string name="widget_list_title">短信</string>
     <string name="widget_list_empty">暂无消息</string>
     <string name="widget_new_msg">新建短信</string>
+    <string name="widget_list_more">更多</string>
     <string name="settings_default_app_active">当前已是系统默认短信应用</string>
     <string name="settings_default_app_hint">设为默认短信应用后，本应用才能读取系统短信数据库。</string>
     <string name="settings_ads_in_all">全部标签显示广告短信</string>

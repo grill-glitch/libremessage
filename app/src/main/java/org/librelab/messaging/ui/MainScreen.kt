@@ -177,6 +177,15 @@ fun MainScreen(
             vm.setFilter(SmsFilter.PACKAGE)
         } else if (shortcutTarget == 4 && initialThreadId > 0) {
             navController.navigate(ThreadRoute(initialThreadId, "", ""))
+        } else {
+            // Plain launch (app icon, widget header / "more" link): come
+            // back to the home conversation list. Without this, a warm
+            // start while a thread is open would stay on that thread and
+            // the widget "more" link would appear dead.
+            navController.navigate(HomeRoute) {
+                popUpTo(navController.graph.id) { inclusive = false }
+                launchSingleTop = true
+            }
         }
     }
 

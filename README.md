@@ -29,6 +29,16 @@ Compose. A clean, modern SMS client with no Google proprietary code.
   system language
 - **MMS notification** — incoming MMS is surfaced as a notification
   (viewing MMS content is not supported yet)
+- **Home-screen widgets** — a verification-code card (2×1 / 2×3) and a
+  recent-conversations list (4×2) with contact names, colored avatars and
+  tap-to-open; the code card refreshes instantly when a new code arrives
+
+## Screenshots
+
+![Conversations widget](docs/screenshots/widget-list.png)
+
+The conversations widget on the home screen — latest threads with contact
+names, colored avatars and message previews.
 
 ## Build
 

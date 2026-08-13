@@ -328,9 +328,14 @@ fun ThreadDetailScreen(
                     } else {
                         // After the first send from a share intent the thread
                         // id flips to the real one; fall back through sender →
-                        // address → the number the user actually typed.
+                        // address → the number the user actually typed. When
+                        // opened from a widget we only have the thread id, so
+                        // infer the contact from the loaded messages.
+                        val inferredContact = messages.firstOrNull { !it.isSent }
+                            ?.let { it.contactName ?: it.sender.ifBlank { it.address } }
+                            .orEmpty()
                         val titleText = if (isNewThread) newNumber
-                        else sender.ifBlank { address }.ifBlank { newNumber }
+                        else sender.ifBlank { address }.ifBlank { inferredContact }.ifBlank { newNumber }
                         val ac = avatarColorFor(titleText)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             InitialAvatar(

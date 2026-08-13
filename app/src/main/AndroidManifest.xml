@@ -96,12 +96,6 @@
                 android:resource="@xml/list_widget_info" />
         </receiver>
 
-        <!-- Feeds the ListView inside the conversations widget. -->
-        <service
-            android:name=".ListWidgetService"
-            android:exported="false"
-            android:permission="android.permission.BIND_REMOTEVIEWS" />
-
         <!-- Incoming SMS: SMS_RECEIVED reaches every receiver, SMS_DELIVER is
              routed exclusively to the default SMS app. Both land here. -->
         <receiver

@@ -7,17 +7,18 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
-import android.graphics.Color
-import android.net.Uri
 import android.provider.ContactsContract
 import android.provider.Telephony
 import android.widget.RemoteViews
-import android.widget.RemoteViewsService
 
 /**
  * Home-screen widget listing the most recent conversations, mirroring the
- * app's home list (contact name + last message + time). Rendered as a
- * ListView fed by [ListWidgetViewsFactory] via [ListWidgetService].
+ * app's home list (contact name + last message + time).
+ *
+ * Uses FIXED rows (not a ListView): some launchers drop the fill-in extras
+ * of ListView items, which would land taps on the home screen instead of
+ * the thread. Each fixed row carries its own click PendingIntent with the
+ * thread id in the extras.
  *
  * Tapping a row opens that thread in the app; the header opens the app;
  * the bottom-right FAB starts a new message.
@@ -26,53 +27,96 @@ class ListWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { id ->
-            val views = buildViews(context)
-            appWidgetManager.updateAppWidget(id, views)
+            appWidgetManager.updateAppWidget(id, buildViews(context))
         }
     }
 
     private fun buildViews(context: Context): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_list)
-        // ListView backed by a RemoteViewsService (separate process).
-        val intent = Intent(context, ListWidgetService::class.java).apply {
-            data = Uri.parse("widget://org.librelab.messaging/list")
-        }
-        views.setRemoteAdapter(R.id.widget_list_view, intent)
-        views.setEmptyView(R.id.widget_list_view, R.id.widget_list_empty)
+        val threads = loadThreads(context)
 
-        // Header tap -> open the app.
-        val open = PendingIntent.getActivity(
-            context,
-            0,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        // Header tap -> open the app (no action = plain launch).
+        views.setOnClickPendingIntent(
+            R.id.widget_list_header,
+            openApp(context, 0, "", -1L)
         )
-        views.setOnClickPendingIntent(R.id.widget_list_header, open)
 
         // FAB -> new-message draft (same action as the launcher shortcut).
-        val compose = PendingIntent.getActivity(
-            context,
-            1,
-            Intent(context, MainActivity::class.java)
-                .setAction("org.librelab.messaging.action.NEW_MESSAGE"),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        views.setOnClickPendingIntent(
+            R.id.widget_new_msg,
+            openApp(context, 1, "org.librelab.messaging.action.NEW_MESSAGE", -1L)
         )
-        views.setOnClickPendingIntent(R.id.widget_new_msg, compose)
 
-        // Row tap -> open the thread. The service passes a thread id per row.
-        val rowTemplate = Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-        }
-        views.setPendingIntentTemplate(
-            R.id.widget_list_view,
-            PendingIntent.getActivity(
-                context,
-                0,
-                rowTemplate,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        // Fill the fixed rows; hide the unused ones.
+        val rows = arrayOf(
+            R.id.widget_row0_root to arrayOf(
+                R.id.widget_row0_avatar, R.id.widget_row0_name,
+                R.id.widget_row0_preview, R.id.widget_row0_time
+            ),
+            R.id.widget_row1_root to arrayOf(
+                R.id.widget_row1_avatar, R.id.widget_row1_name,
+                R.id.widget_row1_preview, R.id.widget_row1_time
+            ),
+            R.id.widget_row2_root to arrayOf(
+                R.id.widget_row2_avatar, R.id.widget_row2_name,
+                R.id.widget_row2_preview, R.id.widget_row2_time
+            ),
+            R.id.widget_row3_root to arrayOf(
+                R.id.widget_row3_avatar, R.id.widget_row3_name,
+                R.id.widget_row3_preview, R.id.widget_row3_time
+            ),
+            R.id.widget_row4_root to arrayOf(
+                R.id.widget_row4_avatar, R.id.widget_row4_name,
+                R.id.widget_row4_preview, R.id.widget_row4_time
+            ),
+            R.id.widget_row5_root to arrayOf(
+                R.id.widget_row5_avatar, R.id.widget_row5_name,
+                R.id.widget_row5_preview, R.id.widget_row5_time
             )
         )
+
+        for (i in rows.indices) {
+            val (root, ids) = rows[i]
+            val (avatar, name, preview, time) = ids
+            if (i < threads.size) {
+                val t = threads[i]
+                views.setViewVisibility(root, android.view.View.VISIBLE)
+                views.setTextViewText(name, t.sender)
+                views.setTextViewText(preview, t.preview)
+                views.setTextViewText(time, t.time)
+                views.setTextViewText(avatar, t.avatarInitial)
+                views.setColorStateList(
+                    avatar,
+                    "setBackgroundTintList",
+                    android.content.res.ColorStateList.valueOf(t.avatarColor)
+                )
+                views.setTextColor(avatar, t.avatarContent)
+                views.setOnClickPendingIntent(
+                    root,
+                    openApp(context, 10 + i, "org.librelab.messaging.action.OPEN_THREAD", t.threadId)
+                )
+            } else {
+                views.setViewVisibility(root, android.view.View.GONE)
+            }
+        }
+
+        if (threads.isEmpty()) {
+            views.setViewVisibility(R.id.widget_list_empty, android.view.View.VISIBLE)
+        } else {
+            views.setViewVisibility(R.id.widget_list_empty, android.view.View.GONE)
+        }
         return views
+    }
+
+    private fun openApp(context: Context, requestCode: Int, action: String, threadId: Long): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).setAction(action)
+        if (threadId > 0) intent.putExtra("threadId", threadId)
+        return PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     companion object {
@@ -83,195 +127,15 @@ class ListWidgetProvider : AppWidgetProvider() {
                 ComponentName(context, ListWidgetProvider::class.java)
             )
             if (ids.isNotEmpty()) {
-                manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list_view)
+                ListWidgetProvider().onUpdate(context, manager, ids)
             }
         }
     }
 }
 
-/** Bound service feeding conversation rows to the widget's ListView. */
-class ListWidgetService : RemoteViewsService() {
-    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
-        ListWidgetViewsFactory(applicationContext)
-}
-
-/** Loads the latest threads directly from the SMS provider. */
-class ListWidgetViewsFactory(
-    private val context: Context
-) : RemoteViewsService.RemoteViewsFactory {
-
-    private val threads = ArrayList<SmsThreadRow>()
-    private val resolver = context.contentResolver
-
-    override fun onCreate() = loadThreads()
-
-    override fun onDataSetChanged() {
-        loadThreads()
-    }
-
-    override fun onDestroy() = threads.clear()
-
-    override fun getCount(): Int = threads.size
-
-    override fun getViewAt(position: Int): RemoteViews {
-        val row = threads[position]
-        val views = RemoteViews(context.packageName, R.layout.widget_list_row)
-        views.setTextViewText(R.id.widget_row_name, row.sender)
-        views.setTextViewText(R.id.widget_row_preview, row.preview)
-        views.setTextViewText(R.id.widget_row_time, row.time)
-        views.setTextViewText(R.id.widget_row_avatar, row.avatarInitial)
-        // Colored avatar, same palette as the app (deterministic per sender).
-        // Tint the oval background so the circle shape is preserved; the
-        // letter is drawn in the palette's dark content color.
-        views.setColorStateList(
-            R.id.widget_row_avatar,
-            "setBackgroundTintList",
-            android.content.res.ColorStateList.valueOf(row.avatarColor)
-        )
-        views.setTextColor(R.id.widget_row_avatar, row.avatarContent)
-        // Row tap opens the thread.
-        val openThread = Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            putExtra("threadId", row.threadId)
-        }
-        views.setOnClickFillInIntent(R.id.widget_row_root, openThread)
-        return views
-    }
-
-    override fun getLoadingView(): RemoteViews? = null
-
-    override fun getViewTypeCount(): Int = 1
-
-    override fun getItemId(position: Int): Long = threads[position].threadId
-
-    override fun hasStableIds(): Boolean = true
-
-    private fun loadThreads() {
-        threads.clear()
-        val uri = Telephony.Sms.CONTENT_URI
-        val projection = arrayOf(
-            Telephony.Sms._ID,
-            Telephony.Sms.ADDRESS,
-            Telephony.Sms.BODY,
-            Telephony.Sms.DATE,
-            Telephony.Sms.THREAD_ID
-        )
-        val cursor: Cursor? = try {
-            resolver.query(
-                uri, projection,
-                "${Telephony.Sms.TYPE} IN (1,2,4,5,6)",
-                null,
-                "${Telephony.Sms.DATE} DESC"
-            )
-        } catch (e: Exception) {
-            null
-        }
-        // Group by thread, keep the latest message per thread.
-        val byThread = LinkedHashMap<Long, SmsThreadRow>()
-        cursor?.use { c ->
-            while (c.moveToNext()) {
-                val threadId = c.getLong(c.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID))
-                val date = c.getLong(c.getColumnIndexOrThrow(Telephony.Sms.DATE))
-                val address = c.getString(c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)) ?: ""
-                val body = c.getString(c.getColumnIndexOrThrow(Telephony.Sms.BODY)) ?: ""
-                val existing = byThread[threadId]
-                if (existing == null || date > existing.date) {
-                    // Contact name lookup (normalized number match) — same
-                    // feel as the app's home list.
-                    val name = nameFor(address)
-                    // Avatar: first letter of the name (or last digit of the
-                    // number), colored deterministically like the app.
-                    val initial = (name ?: address)
-                        .firstOrNull()?.uppercase() ?: "?"
-                    byThread[threadId] = SmsThreadRow(
-                        threadId = threadId,
-                        address = address,
-                        sender = name ?: address,
-                        preview = body,
-                        date = date,
-                        avatarInitial = initial,
-                        avatarColor = avatarColorForKey(name ?: address),
-                        avatarContent = avatarContentForKey(name ?: address)
-                    )
-                }
-            }
-        }
-        threads.addAll(
-            byThread.values
-                .sortedByDescending { it.date }
-                .take(8)
-        )
-    }
-
-    /** Contact display name for a number, or null when not in contacts. */
-    private val contactCache = HashMap<String, String?>()
-    private fun nameFor(address: String): String? {
-        contactCache[address]?.let { return it }
-        val digits = address.filter { it.isDigit() }
-        var name: String? = null
-        try {
-            resolver.query(
-                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                arrayOf(
-                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                    ContactsContract.CommonDataKinds.Phone.NUMBER
-                ),
-                null, null, null
-            )?.use { c ->
-                val nameCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-                val numCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                while (c.moveToNext() && name == null) {
-                    val num = c.getString(numCol) ?: continue
-                    if (num.filter { it.isDigit() }.endsWith(digits.takeLast(7))) {
-                        name = c.getString(nameCol)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // no READ_CONTACTS permission or provider error: show the number
-        }
-        contactCache[address] = name
-        return name
-    }
-
-    /** Deterministic palette color — same 8-color MD3 palette as the app. */
-    private fun avatarColorForKey(key: String): Int {
-        // Same AvatarPalette containers as ui/theme/Color.kt.
-        val palette = intArrayOf(
-            0xFFBBDEFB.toInt(), // blue
-            0xFFC8E6C9.toInt(), // green
-            0xFFFFE0B2.toInt(), // orange
-            0xFFE1BEE7.toInt(), // purple
-            0xFFF8BBD0.toInt(), // pink
-            0xFFB2EBF2.toInt(), // cyan
-            0xFFFFCDD2.toInt(), // red
-            0xFFD7CCC8.toInt()  // brown
-        )
-        val idx = (key.hashCode() and Int.MAX_VALUE) % palette.size
-        return palette[idx]
-    }
-
-    /** Matching dark content color for the avatar letter. */
-    private fun avatarContentForKey(key: String): Int {
-        val palette = intArrayOf(
-            0xFF0D47A1.toInt(), // blue
-            0xFF1B5E20.toInt(), // green
-            0xFFE65100.toInt(), // orange
-            0xFF4A148C.toInt(), // purple
-            0xFF880E4F.toInt(), // pink
-            0xFF006064.toInt(), // cyan
-            0xFFB71C1C.toInt(), // red
-            0xFF3E2723.toInt()  // brown
-        )
-        val idx = (key.hashCode() and Int.MAX_VALUE) % palette.size
-        return palette[idx]
-    }
-}
-
-/** One conversation row for the widget list. */
+/** One conversation row for the widget. */
 data class SmsThreadRow(
     val threadId: Long,
-    val address: String,
     val sender: String,
     val preview: String,
     val date: Long,
@@ -281,4 +145,113 @@ data class SmsThreadRow(
 ) {
     val time: String
         get() = android.text.format.DateFormat.format("HH:mm", date).toString()
+}
+
+/** Loads the latest threads directly from the SMS provider. */
+private fun loadThreads(context: Context): List<SmsThreadRow> {
+    val resolver = context.contentResolver
+    val uri = Telephony.Sms.CONTENT_URI
+    val projection = arrayOf(
+        Telephony.Sms._ID,
+        Telephony.Sms.ADDRESS,
+        Telephony.Sms.BODY,
+        Telephony.Sms.DATE,
+        Telephony.Sms.THREAD_ID
+    )
+    val byThread = LinkedHashMap<Long, SmsThreadRow>()
+    val cursor: Cursor? = try {
+        resolver.query(
+            uri, projection,
+            "${Telephony.Sms.TYPE} IN (1,2,4,5,6)",
+            null,
+            "${Telephony.Sms.DATE} DESC"
+        )
+    } catch (e: Exception) {
+        null
+    }
+    cursor?.use { c ->
+        while (c.moveToNext()) {
+            val threadId = c.getLong(c.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID))
+            val date = c.getLong(c.getColumnIndexOrThrow(Telephony.Sms.DATE))
+            val address = c.getString(c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)) ?: ""
+            val body = c.getString(c.getColumnIndexOrThrow(Telephony.Sms.BODY)) ?: ""
+            val existing = byThread[threadId]
+            if (existing == null || date > existing.date) {
+                val name = nameFor(resolver, address)
+                val initial = (name ?: address).firstOrNull()?.uppercase() ?: "?"
+                byThread[threadId] = SmsThreadRow(
+                    threadId = threadId,
+                    sender = name ?: address,
+                    preview = body,
+                    date = date,
+                    avatarInitial = initial,
+                    avatarColor = avatarColorForKey(name ?: address),
+                    avatarContent = avatarContentForKey(name ?: address)
+                )
+            }
+        }
+    }
+    return byThread.values.sortedByDescending { it.date }.take(6)
+}
+
+/** Contact display name for a number, or null when not in contacts. */
+private val contactCache = HashMap<String, String?>()
+
+private fun nameFor(resolver: android.content.ContentResolver, address: String): String? {
+    contactCache[address]?.let { return it }
+    val digits = address.filter { it.isDigit() }
+    var name: String? = null
+    try {
+        resolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                ContactsContract.CommonDataKinds.Phone.NUMBER
+            ),
+            null, null, null
+        )?.use { c ->
+            val nameCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+            val numCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            while (c.moveToNext() && name == null) {
+                val num = c.getString(numCol) ?: continue
+                if (num.filter { it.isDigit() }.endsWith(digits.takeLast(7))) {
+                    name = c.getString(nameCol)
+                }
+            }
+        }
+    } catch (e: Exception) {
+        // no READ_CONTACTS permission or provider error: show the number
+    }
+    contactCache[address] = name
+    return name
+}
+
+/** Deterministic palette color — same 8-color MD3 palette as the app. */
+private fun avatarColorForKey(key: String): Int {
+    val palette = intArrayOf(
+        0xFFBBDEFB.toInt(), // blue
+        0xFFC8E6C9.toInt(), // green
+        0xFFFFE0B2.toInt(), // orange
+        0xFFE1BEE7.toInt(), // purple
+        0xFFF8BBD0.toInt(), // pink
+        0xFFB2EBF2.toInt(), // cyan
+        0xFFFFCDD2.toInt(), // red
+        0xFFD7CCC8.toInt()  // brown
+    )
+    return palette[(key.hashCode() and Int.MAX_VALUE) % palette.size]
+}
+
+/** Matching dark content color for the avatar letter. */
+private fun avatarContentForKey(key: String): Int {
+    val palette = intArrayOf(
+        0xFF0D47A1.toInt(), // blue
+        0xFF1B5E20.toInt(), // green
+        0xFFE65100.toInt(), // orange
+        0xFF4A148C.toInt(), // purple
+        0xFF880E4F.toInt(), // pink
+        0xFF006064.toInt(), // cyan
+        0xFFB71C1C.toInt(), // red
+        0xFF3E2723.toInt()  // brown
+    )
+    return palette[(key.hashCode() and Int.MAX_VALUE) % palette.size]
 }

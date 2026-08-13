@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Message-list widget: header + ListView of recent conversations, plus a
-     "new message" FAB pinned to the bottom-right corner. -->
+<!-- Message-list widget: header + fixed conversation rows + new-message FAB.
+     Fixed rows (not a ListView) so each row can carry its own click
+     PendingIntent — some launchers drop fill-in extras on ListView items. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -45,15 +46,14 @@
             android:layout_height="1dp"
             android:background="@color/widget_divider" />
 
-        <!-- Conversations -->
-        <ListView
-            android:id="@+id/widget_list_view"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:divider="@color/widget_divider"
-            android:dividerHeight="1dp"
-            android:paddingBottom="4dp" />
+        <!-- 6 conversation rows with independent ids (fixed layout, each row
+             gets its own click PendingIntent). -->
+        <include layout="@layout/widget_list_row0" />
+        <include layout="@layout/widget_list_row1" />
+        <include layout="@layout/widget_list_row2" />
+        <include layout="@layout/widget_list_row3" />
+        <include layout="@layout/widget_list_row4" />
+        <include layout="@layout/widget_list_row5" />
 
         <!-- Empty state -->
         <TextView

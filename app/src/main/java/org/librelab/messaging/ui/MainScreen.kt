@@ -161,7 +161,10 @@ fun MainScreen(
     // activity was started with a number/body/attachment (share intent),
     // or into the matching filter tab via a launcher shortcut (2 = codes,
     // 3 = pickups), or a specific thread from a widget row tap (4).
-    LaunchedEffect(Unit) {
+    //
+    // Keyed on the launch params (not Unit): onNewIntent re-composes
+    // MainScreen with new values, and this must re-run to navigate.
+    LaunchedEffect(shortcutTarget, initialThreadId) {
         if (shortcutTarget == 1 ||
             initialNumber.isNotBlank() || initialBody.isNotBlank() || initialAttachmentUri.isNotBlank()
         ) {

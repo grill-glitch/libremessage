@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+ (API 31): the widget FAB picks up the Material You dynamic
-     accent from the wallpaper via the system color resources. -->
+<!-- Android 12+ (API 31): the widgets pick up the Material You dynamic
+     palette from the wallpaper via the system color resources.
+     neutral1_* = dynamic neutral surface ramp, accent1_* = dynamic
+     primary ramp. Falls back to the static values/ colors below API 31. -->
 <resources>
+    <color name="widget_card_bg">@android:color/system_neutral1_900</color>
+    <color name="widget_text_primary">@android:color/system_neutral1_100</color>
+    <color name="widget_text_secondary">@android:color/system_neutral1_400</color>
+    <color name="widget_text_accent">@android:color/system_accent1_300</color>
+    <color name="widget_divider">@android:color/system_neutral1_700</color>
     <color name="widget_fab_bg">@android:color/system_accent1_400</color>
     <color name="widget_fab_icon">@android:color/system_accent1_100</color>
 </resources>

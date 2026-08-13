@@ -7,17 +7,20 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
+import android.graphics.Color
 import android.net.Uri
+import android.provider.ContactsContract
 import android.provider.Telephony
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 
 /**
  * Home-screen widget listing the most recent conversations, mirroring the
- * app's home list (sender + last message + time). Rendered as a ListView
- * fed by [ListWidgetViewsFactory] via [ListWidgetService].
+ * app's home list (contact name + last message + time). Rendered as a
+ * ListView fed by [ListWidgetViewsFactory] via [ListWidgetService].
  *
- * Tapping a row opens that thread in the app; the header opens the app.
+ * Tapping a row opens that thread in the app; the header opens the app;
+ * the bottom-right FAB starts a new message.
  */
 class ListWidgetProvider : AppWidgetProvider() {
 
@@ -98,6 +101,7 @@ class ListWidgetViewsFactory(
 ) : RemoteViewsService.RemoteViewsFactory {
 
     private val threads = ArrayList<SmsThreadRow>()
+    private val resolver = context.contentResolver
 
     override fun onCreate() = loadThreads()
 
@@ -116,6 +120,15 @@ class ListWidgetViewsFactory(
         views.setTextViewText(R.id.widget_row_preview, row.preview)
         views.setTextViewText(R.id.widget_row_time, row.time)
         views.setTextViewText(R.id.widget_row_avatar, row.avatarInitial)
+        // Colored avatar, same palette as the app (deterministic per sender).
+        // Tint the oval background so the circle shape is preserved; the
+        // letter is drawn in the palette's dark content color.
+        views.setColorStateList(
+            R.id.widget_row_avatar,
+            "setBackgroundTintList",
+            android.content.res.ColorStateList.valueOf(row.avatarColor)
+        )
+        views.setTextColor(R.id.widget_row_avatar, row.avatarContent)
         // Row tap opens the thread.
         val openThread = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
@@ -135,7 +148,6 @@ class ListWidgetViewsFactory(
 
     private fun loadThreads() {
         threads.clear()
-        val resolver = context.contentResolver
         val uri = Telephony.Sms.CONTENT_URI
         val projection = arrayOf(
             Telephony.Sms._ID,
@@ -164,16 +176,22 @@ class ListWidgetViewsFactory(
                 val body = c.getString(c.getColumnIndexOrThrow(Telephony.Sms.BODY)) ?: ""
                 val existing = byThread[threadId]
                 if (existing == null || date > existing.date) {
-                    // Avatar: last digit of the number is more recognizable
-                    // than the leading '+' of an international number.
-                    val digit = address.filter { it.isDigit() }.lastOrNull()?.toString()
+                    // Contact name lookup (normalized number match) — same
+                    // feel as the app's home list.
+                    val name = nameFor(address)
+                    // Avatar: first letter of the name (or last digit of the
+                    // number), colored deterministically like the app.
+                    val initial = (name ?: address)
+                        .firstOrNull()?.uppercase() ?: "?"
                     byThread[threadId] = SmsThreadRow(
                         threadId = threadId,
                         address = address,
-                        sender = address,
+                        sender = name ?: address,
                         preview = body,
                         date = date,
-                        avatarInitial = digit ?: address.firstOrNull()?.uppercase() ?: "?"
+                        avatarInitial = initial,
+                        avatarColor = avatarColorForKey(name ?: address),
+                        avatarContent = avatarContentForKey(name ?: address)
                     )
                 }
             }
@@ -184,6 +202,70 @@ class ListWidgetViewsFactory(
                 .take(8)
         )
     }
+
+    /** Contact display name for a number, or null when not in contacts. */
+    private val contactCache = HashMap<String, String?>()
+    private fun nameFor(address: String): String? {
+        contactCache[address]?.let { return it }
+        val digits = address.filter { it.isDigit() }
+        var name: String? = null
+        try {
+            resolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null, null, null
+            )?.use { c ->
+                val nameCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val numCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                while (c.moveToNext() && name == null) {
+                    val num = c.getString(numCol) ?: continue
+                    if (num.filter { it.isDigit() }.endsWith(digits.takeLast(7))) {
+                        name = c.getString(nameCol)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // no READ_CONTACTS permission or provider error: show the number
+        }
+        contactCache[address] = name
+        return name
+    }
+
+    /** Deterministic palette color — same 8-color MD3 palette as the app. */
+    private fun avatarColorForKey(key: String): Int {
+        // Same AvatarPalette containers as ui/theme/Color.kt.
+        val palette = intArrayOf(
+            0xFFBBDEFB.toInt(), // blue
+            0xFFC8E6C9.toInt(), // green
+            0xFFFFE0B2.toInt(), // orange
+            0xFFE1BEE7.toInt(), // purple
+            0xFFF8BBD0.toInt(), // pink
+            0xFFB2EBF2.toInt(), // cyan
+            0xFFFFCDD2.toInt(), // red
+            0xFFD7CCC8.toInt()  // brown
+        )
+        val idx = (key.hashCode() and Int.MAX_VALUE) % palette.size
+        return palette[idx]
+    }
+
+    /** Matching dark content color for the avatar letter. */
+    private fun avatarContentForKey(key: String): Int {
+        val palette = intArrayOf(
+            0xFF0D47A1.toInt(), // blue
+            0xFF1B5E20.toInt(), // green
+            0xFFE65100.toInt(), // orange
+            0xFF4A148C.toInt(), // purple
+            0xFF880E4F.toInt(), // pink
+            0xFF006064.toInt(), // cyan
+            0xFFB71C1C.toInt(), // red
+            0xFF3E2723.toInt()  // brown
+        )
+        val idx = (key.hashCode() and Int.MAX_VALUE) % palette.size
+        return palette[idx]
+    }
 }
 
 /** One conversation row for the widget list. */
@@ -193,7 +275,9 @@ data class SmsThreadRow(
     val sender: String,
     val preview: String,
     val date: Long,
-    val avatarInitial: String
+    val avatarInitial: String,
+    val avatarColor: Int,
+    val avatarContent: Int
 ) {
     val time: String
         get() = android.text.format.DateFormat.format("HH:mm", date).toString()

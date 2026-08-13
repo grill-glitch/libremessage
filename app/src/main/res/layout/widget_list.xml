@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Message-list widget: header + fixed conversation rows + new-message FAB.
-     Fixed rows (not a ListView) so each row can carry its own click
-     PendingIntent — some launchers drop fill-in extras on ListView items. -->
+     Fixed rows (no scrollable list) so each row carries its own click
+     PendingIntent — some launchers drop fill-in extras on list items. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">

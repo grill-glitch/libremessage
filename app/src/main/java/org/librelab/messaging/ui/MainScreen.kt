@@ -511,25 +511,27 @@ private fun HomeScreen(
                 )
             )
         },
+        // FAB floats above the bottom menu (independent button, not inside
+        // the bar); the bar itself still hides on scroll via the official
+        // scroll behavior.
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { onCompose("") },
+                shape = RoundedCornerShape(18.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(64.dp)
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Outlined.Edit,
+                    contentDescription = stringResource(R.string.action_new_sms),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        },
         bottomBar = {
-            // The new-message button and the tab bar hide/show together via
-            // the official scroll behavior (content up → bar out, down → in).
             BottomAppBar(
                 scrollBehavior = scrollBehavior
             ) {
-                FloatingActionButton(
-                    onClick = { onCompose("") },
-                    shape = RoundedCornerShape(18.dp),
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Outlined.Edit,
-                        contentDescription = stringResource(R.string.action_new_sms),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                Spacer(Modifier.weight(1f))
                 NavigationBarItem(
                     selected = state.tab == 0,
                     onClick = { vm.setTab(0) },

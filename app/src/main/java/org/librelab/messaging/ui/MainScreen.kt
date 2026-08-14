@@ -928,10 +928,12 @@ private fun AntiBombCard(
                     Button(onClick = onRestore) { Text("恢复静音") }
                     OutlinedButton(onClick = onExtend) { Text("+1 分钟") }
                 }
-            } else {
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onDisable) { Text("关闭功能") }
+            }
+            // 关闭功能 always visible, regardless of the countdown state.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onDisable) { Text("关闭功能") }
+                if (remainSec == 0) {
                     OutlinedButton(onClick = onTempUnmute) { Text("临时关闭 1 分钟") }
                 }
             }
@@ -1148,26 +1150,35 @@ private fun SettingsScreen(
 
             HorizontalDivider()
 
-            // 验证码自动复制
+            // 验证码自动复制 (disabled while anti-bombing is on)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.settings_auto_copy),
+                        text = "验证码自动复制",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = if (antiBomb) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onBackground
+                        }
                     )
                     Text(
-                        text = stringResource(R.string.settings_auto_copy_hint),
+                        text = if (antiBomb) {
+                            "防轰炸开启期间已停用"
+                        } else {
+                            "收到验证码短信时，自动把验证码复制到剪贴板"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Switch(
                     checked = autoCopyCode,
-                    onCheckedChange = onToggleAutoCopyCode
+                    onCheckedChange = onToggleAutoCopyCode,
+                    enabled = !antiBomb
                 )
             }
 

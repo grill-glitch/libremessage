@@ -794,7 +794,13 @@ private fun shareMessage(context: Context, message: SmsMessage) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         if (message.imageUris.isNotEmpty()) {
             type = "image/*"
-            putExtra(Intent.EXTRA_STREAM, message.imageUris.first())
+            // file:// URIs (sent-MMS attachments stored in our files dir)
+            // are not exposable since API 24 — map them through the
+            // FileProvider so the chooser can read them.
+            putExtra(
+                Intent.EXTRA_STREAM,
+                shareableImageUri(context, message.imageUris.first())
+            )
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } else {
             type = "text/plain"
@@ -803,6 +809,18 @@ private fun shareMessage(context: Context, message: SmsMessage) {
     }
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_chooser_title)))
 }
+
+/** Map a file:// image URI to a FileProvider content URI (other schemes pass through). */
+private fun shareableImageUri(context: Context, uri: Uri): Uri =
+    if (uri.scheme == "file") {
+        androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            java.io.File(uri.path ?: return uri)
+        )
+    } else {
+        uri
+    }
 
 /** Share plain text via the system chooser (used by multi-select 分享). */
 private fun shareText(context: Context, text: String) {

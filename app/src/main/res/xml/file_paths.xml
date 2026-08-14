@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <files-path name="mms_outbox" path="mms_outbox/" />
+    <files-path name="mms_sent" path="mms_sent/" />
 </paths>

@@ -1,4 +1,4 @@
-# LibreMessage
+# <img src="docs/screenshots/app-icon.svg" width="28" height="28" alt=""> LibreMessage
 
 **English** · [中文](README.zh-CN.md)
 
@@ -38,15 +38,12 @@ Compose. A clean, modern SMS client with no Google proprietary code.
 
 ## Screenshots
 
-![Main screen](docs/screenshots/home-main.png)
+| 主界面 Main | 会话小组件 Widget |
+|---|---|
+| <img src="docs/screenshots/home-main.png" width="280" alt="Main screen"> | <img src="docs/screenshots/widget-list.png" width="280" alt="Conversations widget"> |
 
-The main screen — smart verification-code banner, category chips and the
-conversation list.
-
-![Conversations widget](docs/screenshots/widget-list.png)
-
-The conversations widget on the home screen — latest threads with contact
-names, colored avatars and message previews.
+Main screen with the smart verification-code banner, category chips and
+conversation list — next to the home-screen conversations widget.
 
 ## Build
 

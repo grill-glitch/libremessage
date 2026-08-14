@@ -1,4 +1,4 @@
-# LibreMessage(短信)
+# <img src="docs/screenshots/app-icon.svg" width="28" height="28" alt=""> LibreMessage(短信)
 
 [English](README.md) · **中文**
 
@@ -28,13 +28,11 @@ Google 专有代码。
 
 ## 截图
 
-![主界面](docs/screenshots/home-main.png)
+| 主界面 | 会话小组件 |
+|---|---|
+| <img src="docs/screenshots/home-main.png" width="280" alt="主界面"> | <img src="docs/screenshots/widget-list.png" width="280" alt="会话小组件"> |
 
-主界面 — 智能验证码 banner、分类标签与会话列表。
-
-![会话列表小组件](docs/screenshots/widget-list.png)
-
-主屏上的会话列表小组件 — 最近会话,含联系人名字、彩色头像与消息预览。
+主界面(智能验证码 banner、分类标签与会话列表)与主屏会话小组件。
 
 ## 构建
 

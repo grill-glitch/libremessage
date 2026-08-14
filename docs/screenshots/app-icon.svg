@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
+  <defs>
+    <radialGradient id="glow" cx="28.54" cy="28.54" r="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.19"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="108" height="108" fill="#359944"/>
+  <path fill="#ffffff" fill-rule="evenodd" d="M54,76C66.15,76 76,66.15 76,54C76,49.769 74.806,45.817 72.736,42.463L74.327,36.098C74.693,34.634 73.366,33.307 71.902,33.673L65.537,35.264C62.183,33.194 58.231,32 54,32C41.85,32 32,41.85 32,54C32,66.15 41.85,76 54,76Z"/>
+  <path fill="#143721" fill-rule="evenodd" d="M54,66C60.75,66 66,63.627 66,57C66,47.373 60.75,42 54,42C47.25,42 42,47.373 42,57C42,63.627 47.25,66 54,66ZM54,57.5C57.057,57.5 60.055,56.942 62,56C61.125,58.603 59.333,62 54,62C48.667,62 46.875,58.603 46,56C47.945,56.942 50.943,57.5 54,57.5Z"/>
+  <circle cx="28.54" cy="28.54" r="72" fill="url(#glow)" fill-opacity="0.6"/>
+</svg>

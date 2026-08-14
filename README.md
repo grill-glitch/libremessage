@@ -29,11 +29,19 @@ Compose. A clean, modern SMS client with no Google proprietary code.
   system language
 - **MMS notification** — incoming MMS is surfaced as a notification
   (viewing MMS content is not supported yet)
+- **Anti verification-code bombing** — mute code-message notifications,
+  hide them from the home list (the smart banner stays) and temporarily
+  allow codes through for 1 minute with a live countdown
 - **Home-screen widgets** — a verification-code card (2×1 / 2×3) and a
   recent-conversations list (4×2) with contact names, colored avatars and
   tap-to-open; the code card refreshes instantly when a new code arrives
 
 ## Screenshots
+
+![Main screen](docs/screenshots/home-main.png)
+
+The main screen — smart verification-code banner, category chips and the
+conversation list.
 
 ![Conversations widget](docs/screenshots/widget-list.png)
 

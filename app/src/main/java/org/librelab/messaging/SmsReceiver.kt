@@ -46,12 +46,19 @@ class SmsReceiver : BroadcastReceiver() {
 
         // Setting: 广告短信静音 (ad messages never pop a notification).
         val adMuted = category == MessageCategory.AD && !prefs.getBoolean("notify_ads", false)
-        if (!adMuted) {
+        // Anti-bombing: mute code messages (no notification, no auto-copy)
+        // until the temporary accept window ends.
+        val antiBomb = prefs.getBoolean("anti_bomb", false)
+        val bombWindow = prefs.getLong("anti_bomb_until", 0L)
+        val bombActive = antiBomb && System.currentTimeMillis() > bombWindow
+        val codeMuted = category == MessageCategory.CODE && bombActive
+
+        if (!adMuted && !codeMuted) {
             Notifications.notifyIncoming(context, address, body)
         }
 
         // Setting: 验证码自动复制 (copy the code to the clipboard silently).
-        if (category == MessageCategory.CODE && prefs.getBoolean("auto_copy_code", true)) {
+        if (category == MessageCategory.CODE && !codeMuted && prefs.getBoolean("auto_copy_code", true)) {
             SmsParser.extractCode(body)?.let { code ->
                 try {
                     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)

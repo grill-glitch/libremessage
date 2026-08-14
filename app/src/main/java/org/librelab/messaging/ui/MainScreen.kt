@@ -262,12 +262,14 @@ fun MainScreen(
                 showAdsInAll = s.showAdsInAll,
                 notifyAds = s.notifyAds,
                 autoCopyCode = s.autoCopyCode,
+                antiBomb = s.antiBomb,
                 defaultSubId = s.defaultSubId,
                 simCards = s.simCards,
                 onSetDefaultApp = rememberSetDefaultApp(vm),
                 onToggleAdsInAll = { vm.setShowAdsInAll(it) },
                 onToggleNotifyAds = { vm.setNotifyAds(it) },
                 onToggleAutoCopyCode = { vm.setAutoCopyCode(it) },
+                onToggleAntiBomb = { vm.setAntiBomb(it) },
                 onSetDefaultSubId = { vm.setDefaultSubId(it) },
                 onBack = { navController.popBackStack() }
             )
@@ -573,6 +575,10 @@ private fun HomeScreen(
                 },
                 onSetDefaultApp = onSetDefaultApp,
                 onOpenThread = onOpenThread,
+                onDisableAntiBomb = { vm.setAntiBomb(false) },
+                onTempUnmuteCodes = { vm.temporarilyUnmuteCodes() },
+                onExtendUnmute = { vm.extendUnmuteCodes() },
+                onRestoreMute = { vm.restoreCodeMute() },
                 modifier = Modifier
                     .padding(innerPadding)
                     .fillMaxSize()
@@ -603,11 +609,27 @@ private fun SmsListContent(
     selectedIds: Set<Long> = emptySet(),
     onToggleSelect: (SmsThreadItem) -> Unit = {},
     onLongPress: (SmsThreadItem) -> Unit = {},
+    onDisableAntiBomb: () -> Unit = {},
+    onTempUnmuteCodes: () -> Unit = {},
+    onExtendUnmute: () -> Unit = {},
+    onRestoreMute: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val filters = remember { SmsFilter.entries.toList() }
     val pagerState = rememberPagerState(initialPage = filters.indexOf(state.filter)) { filters.size }
+
+    // Anti-bomb countdown ticker: re-renders the card every second while a
+    // temporary "accept codes" window is open.
+    var nowTick by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(state.antiBombUntil) {
+        while (state.antiBombUntil > 0L && System.currentTimeMillis() < state.antiBombUntil) {
+            nowTick = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    val antiBombRemainSec =
+        ((state.antiBombUntil - nowTick) / 1000).coerceAtLeast(0).toInt()
 
     // Swipe left/right on the list switches the category chip. Only fire
     // after the user actually swiped — on first composition currentPage is
@@ -644,6 +666,17 @@ private fun SmsListContent(
                 body = stringResource(R.string.setup_default_body),
                 buttonText = stringResource(R.string.action_go_settings),
                 onClick = onSetDefaultApp
+            )
+        }
+
+        // 防验证码轰炸卡片:功能开启时告知用户,并提供关闭/临时接收入口。
+        if (state.antiBomb) {
+            AntiBombCard(
+                remainSec = antiBombRemainSec,
+                onDisable = onDisableAntiBomb,
+                onTempUnmute = onTempUnmuteCodes,
+                onExtend = onExtendUnmute,
+                onRestore = onRestoreMute
             )
         }
 
@@ -857,6 +890,56 @@ private fun EmptyBox(text: String) {
 }
 
 @Composable
+private fun AntiBombCard(
+    remainSec: Int,
+    onDisable: () -> Unit,
+    onTempUnmute: () -> Unit,
+    onExtend: () -> Unit,
+    onRestore: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                text = "防验证码轰炸已开启",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "验证码已静音：不再弹通知，也不在首页显示。需要接收验证码时可临时放行。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            if (remainSec > 0) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "临时接收中，剩余 $remainSec 秒",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onRestore) { Text("恢复静音") }
+                    OutlinedButton(onClick = onExtend) { Text("+1 分钟") }
+                }
+            } else {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onDisable) { Text("关闭功能") }
+                    OutlinedButton(onClick = onTempUnmute) { Text("临时关闭 1 分钟") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SetupCard(
     title: String,
     body: String,
@@ -900,12 +983,14 @@ private fun SettingsScreen(
     showAdsInAll: Boolean,
     notifyAds: Boolean,
     autoCopyCode: Boolean,
+    antiBomb: Boolean,
     defaultSubId: Int,
     simCards: List<SimCard>,
     onSetDefaultApp: () -> Unit,
     onToggleAdsInAll: (Boolean) -> Unit,
     onToggleNotifyAds: (Boolean) -> Unit,
     onToggleAutoCopyCode: (Boolean) -> Unit,
+    onToggleAntiBomb: (Boolean) -> Unit,
     onSetDefaultSubId: (Int) -> Unit,
     onBack: () -> Unit
 ) {
@@ -1083,6 +1168,31 @@ private fun SettingsScreen(
                 Switch(
                     checked = autoCopyCode,
                     onCheckedChange = onToggleAutoCopyCode
+                )
+            }
+
+            HorizontalDivider()
+
+            // 防验证码轰炸
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "防验证码轰炸",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "静音验证码通知，验证码不在首页显示，防止轰炸骚扰",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = antiBomb,
+                    onCheckedChange = onToggleAntiBomb
                 )
             }
         }

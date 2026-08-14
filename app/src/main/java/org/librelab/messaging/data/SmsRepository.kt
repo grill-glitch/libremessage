@@ -85,6 +85,26 @@ class SmsRepository(private val context: Context) {
             .edit().putBoolean("auto_copy_code", auto).apply()
     }
 
+    /** Anti verification-code-bombing: mute code messages + hide from 全部. */
+    fun antiBomb(): Boolean =
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .getBoolean("anti_bomb", false)
+
+    fun setAntiBomb(on: Boolean) {
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("anti_bomb", on).apply()
+    }
+
+    /** End of the temporary "accept codes" window (epoch millis, 0 = none). */
+    fun antiBombUntil(): Long =
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .getLong("anti_bomb_until", 0L)
+
+    fun setAntiBombUntil(until: Long) {
+        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+            .edit().putLong("anti_bomb_until", until).apply()
+    }
+
     /** Default SIM subscription id for outgoing messages (0 = auto/system). */
     fun defaultSubId(): Int =
         context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)

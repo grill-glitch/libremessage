@@ -33,6 +33,8 @@ data class UiState(
     val showAdsInAll: Boolean = false,
     val notifyAds: Boolean = false,
     val autoCopyCode: Boolean = true,
+    val antiBomb: Boolean = false,
+    val antiBombUntil: Long = 0L,
     val defaultSubId: Int = 0,       // 0 = auto / system default SIM
     val simCards: List<SimCard> = emptyList()
 ) {
@@ -90,8 +92,12 @@ data class UiState(
         // 设置里关闭"全部标签显示广告"时,把广告从全部列表剔除
         // (广告标签仍可单独查看)。
         val hideAdsInAll = f == SmsFilter.ALL && !showAdsInAll
+        // 防验证码轰炸:验证码从全部列表隐藏,但首页 banner 保留
+        // (banner 数据源 allCodeEntries 不走这里);临时接收窗口内恢复。
+        val antiBombActive = antiBomb && System.currentTimeMillis() > antiBombUntil
         return messages.filter { m ->
             (!hideAdsInAll || m.category != MessageCategory.AD) &&
+                (!(antiBombActive && f == SmsFilter.ALL) || m.category != MessageCategory.CODE) &&
                 f.matches(m.category, m.body) &&
                 (q.isEmpty() || m.body.contains(q, ignoreCase = true) || m.address.contains(q, ignoreCase = true))
         }
@@ -176,6 +182,8 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
                 showAdsInAll = repository.showAdsInAll(),
                 notifyAds = repository.notifyAds(),
                 autoCopyCode = repository.autoCopyCode(),
+                antiBomb = repository.antiBomb(),
+                antiBombUntil = repository.antiBombUntil(),
                 defaultSubId = repository.defaultSubId()
             )
         }
@@ -272,6 +280,32 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     fun setAutoCopyCode(auto: Boolean) {
         repository.setAutoCopyCode(auto)
         _state.update { it.copy(autoCopyCode = auto) }
+    }
+
+    /** 防验证码轰炸:静音验证码 + 全部标签列表隐藏(首页 banner 保留)。 */
+    fun setAntiBomb(on: Boolean) {
+        repository.setAntiBomb(on)
+        _state.update { it.copy(antiBomb = on) }
+    }
+
+    /** 临时接收验证码 1 分钟(倒计时窗口)。 */
+    fun temporarilyUnmuteCodes() {
+        val until = System.currentTimeMillis() + 60_000L
+        repository.setAntiBombUntil(until)
+        _state.update { it.copy(antiBombUntil = until) }
+    }
+
+    /** 临时窗口再 +1 分钟。 */
+    fun extendUnmuteCodes() {
+        val until = maxOf(_state.value.antiBombUntil, System.currentTimeMillis()) + 60_000L
+        repository.setAntiBombUntil(until)
+        _state.update { it.copy(antiBombUntil = until) }
+    }
+
+    /** 立即恢复静音(结束临时窗口)。 */
+    fun restoreCodeMute() {
+        repository.setAntiBombUntil(0L)
+        _state.update { it.copy(antiBombUntil = 0L) }
     }
 
     /** Enumerate active SIM cards (safe: empty list when unavailable). */

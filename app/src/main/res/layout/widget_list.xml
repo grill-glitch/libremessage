@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Message-list widget: header + fixed conversation rows + new-message FAB.
-     Fixed rows (no scrollable list) — crDroid's launcher intercepts every
-     touch on ListView items (fill-in extras dropped, per-row click intents
-     never delivered), so each row carries its own click PendingIntent and
-     the list is a fixed set of the latest conversations. -->
+<!-- Message-list widget: header + scrollable ListView of conversations +
+     new-message FAB. Rows are fed by ListWidgetService. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -57,14 +54,16 @@
             android:layout_height="1dp"
             android:background="@color/widget_divider" />
 
-        <!-- 6 conversation rows with independent ids (fixed layout, each row
-             gets its own click PendingIntent). -->
-        <include layout="@layout/widget_list_row0" />
-        <include layout="@layout/widget_list_row1" />
-        <include layout="@layout/widget_list_row2" />
-        <include layout="@layout/widget_list_row3" />
-        <include layout="@layout/widget_list_row4" />
-        <include layout="@layout/widget_list_row5" />
+        <!-- Conversations (scrollable) -->
+        <ListView
+            android:id="@+id/widget_list_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:divider="@color/widget_divider"
+            android:dividerHeight="1dp"
+            android:paddingBottom="4dp"
+            android:scrollbars="none" />
 
         <!-- Empty state -->
         <TextView

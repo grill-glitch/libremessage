@@ -1,0 +1,39 @@
+// LibreMessage — default SMS application (org.librelab.messaging).
+//
+// Built from the release APK produced by the Gradle project at
+// https://github.com/grill-glitch/libremessage (the app is a Jetpack
+// Compose application; Soong has no Compose/Coil build support, so the
+// ROM consumes the signed APK as a prebuilt, exactly like other Compose
+// system apps).
+//
+// To update the prebuilt: build the release APK (./gradlew assembleRelease)
+// and copy app/build/outputs/apk/release/app-release.apk here as
+// LibreMessage.apk, then rebuild the LibreMessage module.
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+android_app_import {
+    name: "LibreMessage",
+    apk: "LibreMessage.apk",
+
+    // Keep the developer's release signature: devices that already run
+    // the release APK can upgrade to the ROM build without wiping data,
+    // and the app stays updatable as a regular app. The default-SMS-app
+    // role grants the telephony permissions regardless of the signature.
+    presigned: true,
+    // targetSdkVersion >= 30 presigned APKs must be preprocessed (already
+    // zipaligned + v2-signed by Gradle) or the build system would wreck
+    // the signature.
+    preprocessed: true,
+
+    // Compose pulls these optional uses-library tags into the manifest
+    // (androidx.window.extensions / androidx.window.sidecar). Both are
+    // optional at runtime, so ignore Soong's shared-library check.
+    optional_uses_libs: [
+        "androidx.window.extensions",
+        "androidx.window.sidecar",
+    ],
+}

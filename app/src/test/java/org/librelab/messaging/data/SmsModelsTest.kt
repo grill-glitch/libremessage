@@ -144,4 +144,21 @@ class SmsModelsTest {
         assertTrue(mmsIsSent(2))
         assertTrue(mmsIsSent(4))
     }
+
+    // ---- redacted-address matching (privacy tooling masks SMS addresses) ----
+    @Test
+    fun redactedMatchesVisibleEnds() {
+        // "+861****3748" → "8613748" = 86 + first digit 1 + last-4 3748.
+        assertTrue(redactedMatches("8613748", "18857133748"))
+        // Wrong first digit (landline) / wrong tail must not match.
+        assertFalse(redactedMatches("8613748", "05713748"))
+        assertFalse(redactedMatches("8613748", "18857130000"))
+        // Tail-only fallback for shorter keys.
+        assertTrue(redactedMatches("3748", "18857133748"))
+        assertFalse(redactedMatches("3748", "18857130000"))
+        // Too-short keys carry no information.
+        assertFalse(redactedMatches("123", "18857133748"))
+        // Candidate shorter than the key can never match.
+        assertFalse(redactedMatches("8613748", "7133748"))
+    }
 }

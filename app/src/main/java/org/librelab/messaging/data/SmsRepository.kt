@@ -380,11 +380,23 @@ class SmsRepository(private val context: Context) {
         if (number.isBlank()) return null
         contactCache[number]?.let { return it }
         var info = phoneLookup(number)
+        val key = normalizeNumber(number)
         // PhoneLookup can miss on country-code/format differences
-        // (+8618857133748 vs 18857133748 stored bare). Fall back to a
+        // (+861****3748 vs 18857133748 stored bare). Fall back to a
         // normalized index of all contact numbers.
         if (info == null) {
-            contactNumberIndex()[normalizeNumber(number)]?.let { info = it }
+            contactNumberIndex()[key]?.let { info = it }
+        }
+        // Privacy tooling stores the SMS address redacted ("+861****3748"),
+        // so the normalized key only carries its visible digits ("8613748").
+        // Match those against the index by first/last visible digits — but
+        // only when the match is unambiguous (every mainland mobile shares
+        // the first digit 1, so several contacts can share the visible
+        // ends; guessing wrong would mislabel the sender).
+        if (info == null && key.length < 11) {
+            val candidates = contactNumberIndex().entries
+                .filter { (cand, _) -> redactedMatches(key, cand) }
+            if (candidates.size == 1) info = candidates[0].value
         }
         if (info != null) contactCache[number] = info
         return info
@@ -413,7 +425,9 @@ class SmsRepository(private val context: Context) {
 
     /**
      * Digits-only, country code stripped for mainland numbers:
-     * "+8618857133748" / "8618857133748" / "188 5713 3748" -> "18857133748".
+     * "8618857133748" / "188 5713 3748" -> "18857133748".
+     * A redacted address ("+861****3748") only yields its visible digits
+     * ("8613748") — matched separately via [redactedMatches].
      */
     private fun normalizeNumber(n: String): String {
         var d = n.filter { it.isDigit() }
@@ -509,3 +523,22 @@ fun smsIsSent(type: Int): Boolean = type == Telephony.Sms.MESSAGE_TYPE_SENT
 
 /** Whether an mms row is our own sent message (anything but inbox). */
 fun mmsIsSent(box: Int): Boolean = box != 1
+
+/**
+ * Whether a redacted phone key — the visible digits of a masked address,
+ * e.g. "+861****3748" → "8613748" — plausibly belongs to a full candidate
+ * key ("18857133748"). Privacy tooling keeps the country code, the first
+ * digit and the last 4 digits visible: "8613748" = 86 + 1 + **** + 3748.
+ * Keys shorter than 4 digits carry too little information to match.
+ */
+fun redactedMatches(redactedKey: String, candidateKey: String): Boolean {
+    if (redactedKey.length < 4 || candidateKey.length < redactedKey.length) return false
+    return if (redactedKey.length == 7 && redactedKey.startsWith("86")) {
+        // 86 + first digit + last-4 pattern: check both visible ends.
+        candidateKey.startsWith(redactedKey[2].toString()) &&
+            candidateKey.endsWith(redactedKey.substring(3))
+    } else {
+        // Fallback: the visible tail must be a suffix of the candidate.
+        candidateKey.endsWith(redactedKey)
+    }
+}

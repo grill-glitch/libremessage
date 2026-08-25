@@ -6,7 +6,9 @@ import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Telephony
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -98,6 +100,10 @@ data class UiState(
 
 class SmsViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        private const val TAG = "LibreMessage"
+    }
+
     private val repository = SmsRepository(application)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -140,7 +146,9 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
+            val t0 = SystemClock.elapsedRealtime()
             val messages = repository.loadAll()
+            Log.d(TAG, "loadAll: ${messages.size} messages in ${SystemClock.elapsedRealtime() - t0} ms")
             _state.update {
                 it.copy(messages = messages, loading = false)
             }

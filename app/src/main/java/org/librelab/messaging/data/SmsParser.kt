@@ -189,6 +189,29 @@ object SmsParser {
         Regex("\\b[A-Z]{2}\\d{9}IE\\b", setOf(RegexOption.IGNORE_CASE)) // An Post
     )
 
+    // Keyword tables pre-compiled once. The previous code built a new
+    // Regex per keyword per message inside classify()/extractCode() —
+    // with ~150 keywords that was the dominant startup cost once the
+    // inbox grows (hundreds of Regex constructions per message).
+    private val CODE_PATTERNS: List<Regex> by lazy {
+        CODE_KEYWORDS.map { Regex(it, RegexOption.IGNORE_CASE) }
+    }
+    private val AD_PATTERNS: List<Regex> by lazy {
+        AD_KEYWORDS.map { Regex(it, RegexOption.IGNORE_CASE) }
+    }
+    private val BANK_PATTERNS: List<Regex> by lazy {
+        BANK_KEYWORDS.map { Regex(it, RegexOption.IGNORE_CASE) }
+    }
+    private val ECOMMERCE_PATTERNS: List<Regex> by lazy {
+        ECOMMERCE_KEYWORDS.map { Regex(it, RegexOption.IGNORE_CASE) }
+    }
+    private val SERVICE_PATTERNS: List<Regex> by lazy {
+        SERVICE_KEYWORDS.map { Regex(it, RegexOption.IGNORE_CASE) }
+    }
+    private val CARRIER_PATTERNS: List<Regex> by lazy {
+        CARRIER_KEYWORDS.map { Regex(it, RegexOption.IGNORE_CASE) }
+    }
+
     /**
      * Extract the verification code. Keyword matching runs on the
      * space-preserving text (English \b word boundaries need the spaces);
@@ -208,12 +231,12 @@ object SmsParser {
         ) {
             EXPRESS_CODE_PATTERN.find(spaced)?.let { return it.groupValues[1] }
         }
-        if (CODE_KEYWORDS.none { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(spaced) }) return null
+        if (CODE_PATTERNS.none { it.containsMatchIn(spaced) }) return null
         val matches = CODE_PATTERN.findAll(text).map { it.value }.toList()
         if (matches.isEmpty()) return null
         // Prefer the sequence closest to the first keyword occurrence.
-        val keywordIndex = CODE_KEYWORDS
-            .mapNotNull { Regex(it, RegexOption.IGNORE_CASE).find(spaced)?.range?.first }
+        val keywordIndex = CODE_PATTERNS
+            .mapNotNull { it.find(spaced)?.range?.first }
             .minOrNull() ?: return matches.first()
         return matches.minByOrNull { kotlin.math.abs(text.indexOf(it) - keywordIndex) }
     }
@@ -275,11 +298,11 @@ object SmsParser {
         if (isPickupCode(body)) return MessageCategory.PACKAGE
         if (extractCode(body) != null) return MessageCategory.CODE
         if (hasTrackingNumber(body)) return MessageCategory.ECOMMERCE
-        if (AD_KEYWORDS.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(body) }) return MessageCategory.AD
-        if (BANK_KEYWORDS.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(body) }) return MessageCategory.BANK
-        if (ECOMMERCE_KEYWORDS.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(body) }) return MessageCategory.ECOMMERCE
-        if (SERVICE_KEYWORDS.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(body) }) return MessageCategory.SERVICE
-        if (CARRIER_KEYWORDS.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(body) }) return MessageCategory.CARRIER
+        if (AD_PATTERNS.any { it.containsMatchIn(body) }) return MessageCategory.AD
+        if (BANK_PATTERNS.any { it.containsMatchIn(body) }) return MessageCategory.BANK
+        if (ECOMMERCE_PATTERNS.any { it.containsMatchIn(body) }) return MessageCategory.ECOMMERCE
+        if (SERVICE_PATTERNS.any { it.containsMatchIn(body) }) return MessageCategory.SERVICE
+        if (CARRIER_PATTERNS.any { it.containsMatchIn(body) }) return MessageCategory.CARRIER
         return if (hasContact) MessageCategory.PERSON else MessageCategory.OTHER
     }
 

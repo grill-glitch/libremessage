@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
+import android.os.SystemClock
 import android.database.Cursor
 import android.net.Uri
 import android.os.Build
@@ -12,6 +13,7 @@ import android.provider.Telephony
 import org.librelab.messaging.util.OutboxStore
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
 /**
@@ -21,7 +23,6 @@ import kotlinx.coroutines.withContext
 class SmsRepository(private val context: Context) {
 
     private val resolver: ContentResolver = context.contentResolver
-    private val contactCache = HashMap<String, ContactInfo>()
 
     /** content://sms/archived — archived threads; URI stable since API 34. */
     private val archivedUri: Uri = Uri.parse("content://sms/archived")
@@ -85,20 +86,24 @@ class SmsRepository(private val context: Context) {
         // The inbox URI only returns type=1 rows, hiding every message this
         // app sent (type=2/5/6). Query the full sms table instead so sent
         // messages and their conversations show up on the home list.
-        val sms = query(
-            uri = Telephony.Sms.CONTENT_URI,
-            selection = "${Telephony.Sms.TYPE} IN (1,2,4,5,6)",
-            selectionArgs = null,
-            sortOrder = "${Telephony.Sms.DATE} DESC"
-        )
-        val mms = queryMms(selection = null, selectionArgs = null, sortOrder = "date DESC")
-        val outbox = outboxMessages()
+        // The three sources are queried concurrently (independent provider
+        // queries; big SMS tables dominate the latency).
+        val sms = async {
+            query(
+                uri = Telephony.Sms.CONTENT_URI,
+                selection = "${Telephony.Sms.TYPE} IN (1,2,4,5,6)",
+                selectionArgs = null,
+                sortOrder = "${Telephony.Sms.DATE} DESC"
+            )
+        }
+        val mms = async { queryMms(selection = null, selectionArgs = null, sortOrder = "date DESC") }
+        val outbox = async { outboxMessages() }
         // Deduplicate by unique key (sms and mms ids may overlap so keys
         // carry a type prefix).
         val byId = LinkedHashMap<String, SmsMessage>()
-        sms.forEach { byId[it.key] = it }
-        mms.forEach { byId.putIfAbsent(it.key, it) }
-        outbox.forEach { byId.putIfAbsent(it.key, it) }
+        sms.await().forEach { byId[it.key] = it }
+        mms.await().forEach { byId.putIfAbsent(it.key, it) }
+        outbox.await().forEach { byId.putIfAbsent(it.key, it) }
         // Locally-archived threads are re-classified as ARCHIVED so they only
         // show up under the 归档 filter.
         val archived = archivedIds()
@@ -382,18 +387,33 @@ class SmsRepository(private val context: Context) {
         return null
     }
 
-    /** Resolve a phone number to a contact name + photo via PhoneLookup. */
+    // Contact resolution cache. Misses are cached too (with a TTL): the
+    // previous code only cached hits, so on a redacted-address device
+    // every message re-ran the PhoneLookup provider query AND a full
+    // contact-index scan — quadratic once the SMS table grows large.
+    private val contactCache = HashMap<String, ContactInfo?>()
+    private var lastContactCacheRefresh = 0L
+
+    private fun maybeRefreshContactCache() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastContactCacheRefresh > CONTACT_CACHE_TTL_MS) {
+            lastContactCacheRefresh = now
+            contactCache.clear()
+            contactNumberIndexMap = null
+        }
+    }
+
+    /** Resolve a phone number to a contact name + photo. Pure in-memory:
+     *  normalized exact match, then the redacted-address fallback. (A
+     *  PhoneLookup provider query used to run per unique address — ~30 ms
+     *  each, so a 200-message inbox took >2 s. The normalized index covers
+     *  every format PhoneLookup could resolve: +86/space/dash stripped.) */
     fun lookupContact(number: String): ContactInfo? {
         if (number.isBlank()) return null
+        maybeRefreshContactCache()
         contactCache[number]?.let { return it }
-        var info = phoneLookup(number)
         val key = normalizeNumber(number)
-        // PhoneLookup can miss on country-code/format differences
-        // (+861****3748 vs 18857133748 stored bare). Fall back to a
-        // normalized index of all contact numbers.
-        if (info == null) {
-            contactNumberIndex()[key]?.let { info = it }
-        }
+        var info = contactNumberIndex()[key]
         // Privacy tooling stores the SMS address redacted ("+861****3748"),
         // so the normalized key only carries its visible digits ("8613748").
         // Match those against the index by first/last visible digits — but
@@ -405,32 +425,17 @@ class SmsRepository(private val context: Context) {
                 .filter { (cand, _) -> redactedMatches(key, cand) }
             if (candidates.size == 1) info = candidates[0].value
         }
-        if (info != null) contactCache[number] = info
+        contactCache[number] = info
         return info
     }
 
-    private fun phoneLookup(number: String): ContactInfo? {
-        val uri = ContactsContract.PhoneLookup.CONTENT_FILTER_URI.buildUpon()
-            .appendPath(Uri.encode(number))
-            .build()
-        return resolver.query(
-            uri,
-            arrayOf(
-                ContactsContract.PhoneLookup.DISPLAY_NAME,
-                ContactsContract.PhoneLookup.PHOTO_URI
-            ),
-            null, null, null
-        )?.use { c ->
-            if (c.moveToFirst()) {
-                ContactInfo(
-                    name = c.getString(0) ?: number,
-                    photoUri = c.getString(1)
-                )
-            } else null
-        }
-    }
-
     private var contactNumberIndexMap: Map<String, ContactInfo>? = null
+
+    companion object {
+        /** How long a contact-resolution cache stays valid (adds/edits to the
+         *  address book become visible after at most this delay). */
+        private const val CONTACT_CACHE_TTL_MS = 60_000L
+    }
 
     /** All contact numbers keyed by normalized digits (built lazily, cached). */
     private fun contactNumberIndex(): Map<String, ContactInfo> {

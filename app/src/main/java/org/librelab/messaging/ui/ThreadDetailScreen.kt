@@ -215,8 +215,12 @@ fun ThreadDetailScreen(
                 .sortedWith(compareBy(collator) { it.name })
         }
     }
-    // Messages are sent to the chosen number in new-thread mode.
-    val targetAddress = if (isNewThread) newNumber else address
+    // Send address: new-thread mode uses the typed number. In an existing
+    // thread, prefer a full (non-redacted) number from the loaded messages —
+    // privacy tooling stores addresses as "+861****3748", which the SMS
+    // stack cannot send to. Fall back to the entry address.
+    val targetAddress = if (isNewThread) newNumber
+    else messages.firstOrNull { !it.address.contains('*') }?.address ?: address
 
     // 发送成功后的清理:清空输入与附件;新会话首条发送时解析真实线程并打开。
     val afterSendSuccess = {
@@ -340,14 +344,19 @@ fun ThreadDetailScreen(
                     } else {
                         // After the first send from a share intent the thread
                         // id flips to the real one; fall back through sender →
-                        // address → the number the user actually typed. When
-                        // opened from a widget we only have the thread id, so
-                        // infer the contact from the loaded messages.
+                        // inferred contact → address → the number the user
+                        // actually typed. When opened from a widget or a
+                        // notification we only have the thread id (sender is
+                        // empty and address may be redacted "+861****3748"),
+                        // so the contact name inferred from the loaded
+                        // messages wins over the raw address — this keeps the
+                        // title and the avatar color identical to the home
+                        // list for every entry point.
                         val inferredContact = messages.firstOrNull { !it.isSent }
                             ?.let { it.contactName ?: it.sender.ifBlank { it.address } }
                             .orEmpty()
                         val titleText = if (isNewThread) newNumber
-                        else sender.ifBlank { address }.ifBlank { inferredContact }.ifBlank { newNumber }
+                        else sender.ifBlank { inferredContact }.ifBlank { address }.ifBlank { newNumber }
                         val ac = avatarColorFor(titleText)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             InitialAvatar(

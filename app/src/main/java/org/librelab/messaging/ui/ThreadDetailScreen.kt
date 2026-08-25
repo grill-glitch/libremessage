@@ -128,6 +128,8 @@ import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.ui.theme.AvatarColor
 import org.librelab.messaging.ui.theme.avatarColorFor
+import org.librelab.messaging.ui.components.ConfirmDialog
+import org.librelab.messaging.ui.components.MultiSelectActions
 import org.librelab.messaging.util.MmsSender
 import org.librelab.messaging.util.OutboxStore
 import org.librelab.messaging.util.formatBubbleTime
@@ -384,58 +386,55 @@ fun ThreadDetailScreen(
                 },
                 actions = {
                     if (multiSelect) {
-                        IconButton(
-                            onClick = {
+                        MultiSelectActions(
+                            allSelected = allSelected,
+                            onToggleAll = {
                                 selectedKeys = if (allSelected) emptySet() else allMessageKeys.toSet()
-                            }
+                            },
+                            tint = MaterialTheme.colorScheme.onSurface
                         ) {
-                            Icon(
-                                imageVector = if (allSelected) MaterialSymbols.Outlined.Deselect else MaterialSymbols.Outlined.Select_all,
-                                contentDescription = stringResource(R.string.action_select_all),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                val text = selectedMessages.joinToString("\n") { it.body }
-                                if (text.isNotBlank()) {
-                                    clipboard.setText(AnnotatedString(text))
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.toast_copied_count, selectedMessages.size),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                            IconButton(
+                                onClick = {
+                                    val text = selectedMessages.joinToString("\n") { it.body }
+                                    if (text.isNotBlank()) {
+                                        clipboard.setText(AnnotatedString(text))
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.toast_copied_count, selectedMessages.size),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                    exitMultiSelect()
                                 }
-                                exitMultiSelect()
+                            ) {
+                                Icon(
+                                    imageVector = MaterialSymbols.Outlined.Content_copy,
+                                    contentDescription = stringResource(R.string.action_copy),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
                             }
-                        ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Outlined.Content_copy,
-                                contentDescription = stringResource(R.string.action_copy),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                val text = selectedMessages.joinToString("\n") { it.body }
-                                if (text.isNotBlank()) shareText(context, text)
-                                exitMultiSelect()
+                            IconButton(
+                                onClick = {
+                                    val text = selectedMessages.joinToString("\n") { it.body }
+                                    if (text.isNotBlank()) shareText(context, text)
+                                    exitMultiSelect()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = MaterialSymbols.Outlined.Share,
+                                    contentDescription = stringResource(R.string.action_share),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
                             }
-                        ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Outlined.Share,
-                                contentDescription = stringResource(R.string.action_share),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(
-                            onClick = { confirmBatchDelete = true }
-                        ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Outlined.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                            IconButton(
+                                onClick = { confirmBatchDelete = true }
+                            ) {
+                                Icon(
+                                    imageVector = MaterialSymbols.Outlined.Delete,
+                                    contentDescription = stringResource(R.string.action_delete),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     } else {
                         IconButton(
@@ -683,26 +682,15 @@ fun ThreadDetailScreen(
 
     // Batch-delete confirmation (multi-select mode).
     if (confirmBatchDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmBatchDelete = false },
-            title = { Text(stringResource(R.string.dialog_delete_message_title)) },
-            text = {
-                Text(stringResource(R.string.dialog_delete_message_body, selectedMessages.size))
+        ConfirmDialog(
+            title = stringResource(R.string.dialog_delete_message_title),
+            body = stringResource(R.string.dialog_delete_message_body, selectedMessages.size),
+            onConfirm = {
+                selectedMessages.forEach { deleteMessage(context, it) }
+                vm.refresh()
+                exitMultiSelect()
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        selectedMessages.forEach { deleteMessage(context, it) }
-                        vm.refresh()
-                        exitMultiSelect()
-                    }
-                ) { Text(stringResource(R.string.action_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmBatchDelete = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
+            onDismiss = { confirmBatchDelete = false }
         )
     }
 
@@ -1066,23 +1054,15 @@ private fun MessageBubble(
     }
 
     if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text(stringResource(R.string.dialog_delete_single_title)) },
-            text = { Text(stringResource(R.string.dialog_delete_irreversible)) },
-            confirmButton = {
-                TextButton({
-                    confirmDelete = false
-                    onDelete(message)
-                }) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmDialog(
+            title = stringResource(R.string.dialog_delete_single_title),
+            body = stringResource(R.string.dialog_delete_irreversible),
+            destructive = true,
+            onConfirm = {
+                confirmDelete = false
+                onDelete(message)
             },
-            dismissButton = {
-                TextButton({ confirmDelete = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
+            onDismiss = { confirmDelete = false }
         )
     }
 }

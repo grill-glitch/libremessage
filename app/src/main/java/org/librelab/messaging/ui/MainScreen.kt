@@ -38,7 +38,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,10 +46,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -112,6 +107,10 @@ import org.librelab.messaging.data.SmsThreadItem
 import kotlinx.coroutines.launch
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.data.UiState
+import org.librelab.messaging.ui.components.ConfirmDialog
+import org.librelab.messaging.ui.components.CodeListPage
+import org.librelab.messaging.ui.components.MultiSelectActions
+import org.librelab.messaging.ui.components.ThreadListPage
 import org.librelab.messaging.util.copyCodeToClipboard
 
 private data class ComposeTarget(val number: String, val body: String)
@@ -363,25 +362,14 @@ private fun HomeScreen(
 
     // Batch-delete confirmation.
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text(stringResource(R.string.dialog_delete_thread_title)) },
-            text = {
-                Text(stringResource(R.string.dialog_delete_thread_body, selectedIds.size))
+        ConfirmDialog(
+            title = stringResource(R.string.dialog_delete_thread_title),
+            body = stringResource(R.string.dialog_delete_thread_body, selectedIds.size),
+            onConfirm = {
+                vm.deleteThreads(selectedIds.toList())
+                exitSelection()
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.deleteThreads(selectedIds.toList())
-                        exitSelection()
-                    }
-                ) { Text(stringResource(R.string.action_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
+            onDismiss = { showDeleteConfirm = false }
         )
     }
 
@@ -420,58 +408,42 @@ private fun HomeScreen(
                 },
                 actions = {
                     if (selectionMode) {
-                        IconButton(
-                            onClick = {
+                        MultiSelectActions(
+                            allSelected = allSelected,
+                            onToggleAll = {
                                 selectedIds = if (allSelected) emptySet() else visibleThreadIds.toSet()
                             },
-                            modifier = Modifier.size(48.dp)
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(48.dp),
+                            onClose = { exitSelection() }
                         ) {
-                            Icon(
-                                imageVector = if (allSelected) {
-                                    MaterialSymbols.Outlined.Deselect
-                                } else {
-                                    MaterialSymbols.Outlined.Select_all
+                            IconButton(
+                                onClick = {
+                                    vm.archiveThreads(selectedIds.toList(), archive = state.filter != SmsFilter.ARCHIVED)
+                                    exitSelection()
                                 },
-                                contentDescription = stringResource(R.string.action_select_all),
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                vm.archiveThreads(selectedIds.toList(), archive = state.filter != SmsFilter.ARCHIVED)
-                                exitSelection()
-                            },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Outlined.Archive,
-                                contentDescription = if (state.filter == SmsFilter.ARCHIVED) {
-                                    stringResource(R.string.action_unarchive)
-                                } else {
-                                    stringResource(R.string.action_archive)
-                                },
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                        IconButton(
-                            onClick = { showDeleteConfirm = true },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Outlined.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                        IconButton(
-                            onClick = { exitSelection() },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Outlined.Close,
-                                contentDescription = stringResource(R.string.action_cancel_selection),
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = MaterialSymbols.Outlined.Archive,
+                                    contentDescription = if (state.filter == SmsFilter.ARCHIVED) {
+                                        stringResource(R.string.action_unarchive)
+                                    } else {
+                                        stringResource(R.string.action_archive)
+                                    },
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            IconButton(
+                                onClick = { showDeleteConfirm = true },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = MaterialSymbols.Outlined.Delete,
+                                    contentDescription = stringResource(R.string.action_delete),
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
                         }
                     } else {
                         IconButton(
@@ -752,13 +724,17 @@ private fun AllFilterPage(
     onToggleSelect: (SmsThreadItem) -> Unit,
     onLongPress: (SmsThreadItem) -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
+    // ALL = the default filter; compute directly so the page renders the
+    // instant it settles, without waiting for chip state to propagate.
+    ThreadListPage(
+        threads = state.threadsFor(SmsFilter.ALL),
+        emptyText = stringResource(R.string.empty_sms),
+        onOpenThread = onOpenThread,
+        selectionMode = selectionMode,
+        selectedIds = selectedIds,
+        onToggleSelect = onToggleSelect,
+        onLongPress = onLongPress,
+        header = {
             SmartCodeCard(
                 message = state.latestCode,
                 allCodes = state.allCodeEntries,
@@ -766,24 +742,7 @@ private fun AllFilterPage(
                 onOpenOriginal = onOpenOriginal
             )
         }
-        // ALL = the default filter; compute directly so the page renders the
-        // instant it settles, without waiting for chip state to propagate.
-        val threads = state.threadsFor(SmsFilter.ALL)
-        if (threads.isEmpty()) {
-            item { EmptyBox(stringResource(R.string.empty_sms)) }
-        } else {
-            items(threads, key = { it.message.threadId }) { thread ->
-                MessageItem(
-                    thread = thread,
-                    onClick = {
-                        if (selectionMode) onToggleSelect(thread) else onOpenThread(thread)
-                    },
-                    onLongClick = { onLongPress(thread) },
-                    selected = thread.message.threadId in selectedIds
-                )
-            }
-        }
-    }
+    )
 }
 
 @Composable
@@ -792,25 +751,12 @@ private fun CodeFilterPage(
     onCopyCode: (String) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        val codes = state.codesFor()
-        if (codes.isEmpty()) {
-            item { EmptyBox(stringResource(R.string.empty_codes)) }
-        } else {
-            items(codes, key = { "${it.key}_${it.code}" }) { msg ->
-                CodeCardRow(
-                    codeMsg = msg,
-                    onCopy = onCopyCode,
-                    onOpenOriginal = onOpenOriginal
-                )
-            }
-        }
-    }
+    CodeListPage(
+        entries = state.codesFor(),
+        emptyText = stringResource(R.string.empty_codes),
+        onCopy = onCopyCode,
+        onOpenOriginal = onOpenOriginal
+    )
 }
 
 @Composable
@@ -819,25 +765,12 @@ private fun PackageFilterPage(
     onCopyCode: (String) -> Unit,
     onOpenOriginal: (SmsMessage) -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        val pickups = state.pickupsFor()
-        if (pickups.isEmpty()) {
-            item { EmptyBox(stringResource(R.string.empty_pickups)) }
-        } else {
-            items(pickups, key = { "${it.key}_${it.code}" }) { msg ->
-                CodeCardRow(
-                    codeMsg = msg,
-                    onCopy = onCopyCode,
-                    onOpenOriginal = onOpenOriginal
-                )
-            }
-        }
-    }
+    CodeListPage(
+        entries = state.pickupsFor(),
+        emptyText = stringResource(R.string.empty_pickups),
+        onCopy = onCopyCode,
+        onOpenOriginal = onOpenOriginal
+    )
 }
 
 @Composable
@@ -850,42 +783,15 @@ private fun ThreadFilterPage(
     onToggleSelect: (SmsThreadItem) -> Unit,
     onLongPress: (SmsThreadItem) -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        val threads = state.threadsFor(filter)
-        if (threads.isEmpty()) {
-            item { EmptyBox(stringResource(R.string.empty_sms)) }
-        } else {
-            items(threads, key = { it.message.threadId }) { thread ->
-                MessageItem(
-                    thread = thread,
-                    onClick = {
-                        if (selectionMode) onToggleSelect(thread) else onOpenThread(thread)
-                    },
-                    onLongClick = { onLongPress(thread) },
-                    selected = thread.message.threadId in selectedIds
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyBox(text: String) {
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+    ThreadListPage(
+        threads = state.threadsFor(filter),
+        emptyText = stringResource(R.string.empty_sms),
+        onOpenThread = onOpenThread,
+        selectionMode = selectionMode,
+        selectedIds = selectedIds,
+        onToggleSelect = onToggleSelect,
+        onLongPress = onLongPress
+    )
 }
 
 @Composable
@@ -1100,112 +1006,85 @@ private fun SettingsScreen(
             HorizontalDivider()
 
             // 全部标签显示广告短信
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.settings_ads_in_all),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_ads_in_all_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = showAdsInAll,
-                    onCheckedChange = onToggleAdsInAll
-                )
-            }
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_ads_in_all),
+                hint = stringResource(R.string.settings_ads_in_all_hint),
+                checked = showAdsInAll,
+                onCheckedChange = onToggleAdsInAll
+            )
 
             HorizontalDivider()
 
             // 广告短信静音
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.settings_mute_ads),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_mute_ads_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = !notifyAds,
-                    onCheckedChange = { onToggleNotifyAds(!it) }
-                )
-            }
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_mute_ads),
+                hint = stringResource(R.string.settings_mute_ads_hint),
+                checked = !notifyAds,
+                onCheckedChange = { onToggleNotifyAds(!it) }
+            )
 
             HorizontalDivider()
 
             // 验证码自动复制 (disabled while anti-bombing is on)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "验证码自动复制",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (antiBomb) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onBackground
-                        }
-                    )
-                    Text(
-                        text = if (antiBomb) {
-                            "防轰炸开启期间已停用"
-                        } else {
-                            "收到验证码短信时，自动把验证码复制到剪贴板"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = autoCopyCode,
-                    onCheckedChange = onToggleAutoCopyCode,
-                    enabled = !antiBomb
-                )
-            }
+            SettingsSwitchRow(
+                title = "验证码自动复制",
+                hint = if (antiBomb) {
+                    "防轰炸开启期间已停用"
+                } else {
+                    "收到验证码短信时，自动把验证码复制到剪贴板"
+                },
+                checked = autoCopyCode,
+                onCheckedChange = onToggleAutoCopyCode,
+                enabled = !antiBomb
+            )
 
             HorizontalDivider()
 
             // 防验证码轰炸
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "防验证码轰炸",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "静音验证码通知，验证码不在首页显示，防止轰炸骚扰",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = antiBomb,
-                    onCheckedChange = onToggleAntiBomb
-                )
-            }
+            SettingsSwitchRow(
+                title = "防验证码轰炸",
+                hint = "静音验证码通知，验证码不在首页显示，防止轰炸骚扰",
+                checked = antiBomb,
+                onCheckedChange = onToggleAntiBomb
+            )
         }
+    }
+}
+
+/** One settings row: title + hint on the left, a switch on the right. */
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    hint: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onBackground
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled
+        )
     }
 }
 

@@ -50,7 +50,7 @@ LibreMessage 可以预装进自定义 ROM(crDroid / LineageOS / AOSP)作为系�
 应用。应用本体是 Jetpack Compose 项目,而 Soong 没有 Compose/Coil 的构建
 支持 —— 因此 ROM 通过 `android_app_import` 直接消费签名后的 release APK,
 与其他 Compose 系统应用的做法一致。集成文件位于**仓库根目录**:
-`Android.bp` + `LibreMessage.apk`(签名 release APK,当前 v1.3.5)。
+`Android.bp` + `LibreMessage.apk`(签名 release APK,当前 v1.3.6)。
 
 ### 加入 ROM 树
 

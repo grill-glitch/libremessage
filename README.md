@@ -62,7 +62,7 @@ as a prebuilt system app. The app itself is a Jetpack Compose project, and
 Soong has no Compose/Coil build support — so the ROM consumes the signed
 release APK via `android_app_import`, exactly like other Compose system
 apps. The integration lives at the **repo root**: `Android.bp` +
-`LibreMessage.apk` (the signed release APK, currently v1.3.5).
+`LibreMessage.apk` (the signed release APK, currently v1.3.6).
 
 ### Add to the ROM tree
 

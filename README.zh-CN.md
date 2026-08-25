@@ -95,6 +95,12 @@ LibreMessage 可以预装进自定义 ROM(crDroid / LineageOS / AOSP)作为系�
 - **默认短信应用**:Android 16 已移除 `config_defaultSmsApp` 机制,首次
   开机不会自动分配角色。需在 设置 → 默认应用 → 短信应用 手动选择一次
   (或首次收发短信时按系统提示选择)。
+- **MMS PDU 代码复用**:`mms/pdu/` 源码是 AOSP `com.google.android.mms.pdu`
+  库的冻结子集,crDroid / LineageOS 树中同源实现在
+  `frameworks/base/telephony/common/com/google/android/mms/pdu`(逻辑完全
+  一致,仅去掉了框架的 `@UnsupportedAppUsage` 注解)。prebuilt APK 自带
+  编译副本是因为框架库是 hidden API;升级 AOSP 版本时保持本地快照与
+  ROM 树同步即可。
 - **更新预装包**:构建新版本(`./gradlew :app:assembleRelease`)后把 APK
   复制覆盖仓库根的 `LibreMessage.apk`,提交推送,然后在 ROM 树中
   `repo sync` 即可。

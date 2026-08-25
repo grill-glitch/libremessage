@@ -109,6 +109,13 @@ apps. The integration lives at the **repo root**: `Android.bp` +
   mechanism, so the role is not pre-assigned at first boot. Set it once in
   Settings → Default apps → SMS app (or answer the system prompt on the
   first message).
+- **MMS PDU code reuse**: the `mms/pdu/` sources are a frozen subset of
+  the AOSP `com.google.android.mms.pdu` library, which ships inside crDroid /
+  LineageOS at `frameworks/base/telephony/common/com/google/android/mms/pdu`
+  (identical logic; only the framework's `@UnsupportedAppUsage` annotations
+  are stripped). The prebuilt APK carries its own compiled copy because
+  the framework library is hidden API, so keep the local snapshot in sync
+  with the ROM tree when bumping AOSP versions.
 - **Updating the prebuilt**: build a new release
   (`./gradlew :app:assembleRelease`), copy the APK over `LibreMessage.apk`
   in the repo root, commit, push, then `repo sync` in the ROM tree.

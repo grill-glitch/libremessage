@@ -114,4 +114,34 @@ class SmsModelsTest {
         )
         assertEquals(listOf("222222", "111111"), entries.map { it.code })
     }
+
+    // ---- delivery-state mapping (sms type / mms msg_box) ----
+    @Test
+    fun smsSendStatusMapping() {
+        assertEquals(SendStatus.SENT, smsSendStatus(2))      // MESSAGE_TYPE_SENT
+        assertEquals(SendStatus.SENDING, smsSendStatus(4))   // MESSAGE_TYPE_QUEUED
+        assertEquals(SendStatus.SENDING, smsSendStatus(6))   // MESSAGE_TYPE_OUTBOX
+        assertEquals(SendStatus.FAILED, smsSendStatus(5))    // MESSAGE_TYPE_FAILED
+        assertEquals(SendStatus.NONE, smsSendStatus(1))      // inbox
+        assertEquals(SendStatus.NONE, smsSendStatus(0))
+    }
+
+    @Test
+    fun mmsSendStatusMapping() {
+        assertEquals(SendStatus.SENT, mmsSendStatus(2))
+        assertEquals(SendStatus.SENDING, mmsSendStatus(4))
+        assertEquals(SendStatus.FAILED, mmsSendStatus(5))
+        assertEquals(SendStatus.NONE, mmsSendStatus(1))
+    }
+
+    @Test
+    fun sentFlagSemantics() {
+        // P0-2 guard: sms OUTBOX rows are NOT flagged sent (original
+        // behaviour); mms anything-but-inbox IS sent.
+        assertTrue(smsIsSent(2))
+        assertFalse(smsIsSent(6))
+        assertFalse(mmsIsSent(1))
+        assertTrue(mmsIsSent(2))
+        assertTrue(mmsIsSent(4))
+    }
 }

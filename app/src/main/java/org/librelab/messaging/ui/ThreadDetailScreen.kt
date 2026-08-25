@@ -216,6 +216,18 @@ fun ThreadDetailScreen(
     // Messages are sent to the chosen number in new-thread mode.
     val targetAddress = if (isNewThread) newNumber else address
 
+    // 发送成功后的清理:清空输入与附件;新会话首条发送时解析真实线程并打开。
+    val afterSendSuccess = {
+        pendingAttachment = null
+        input = ""
+        if (currentThreadId == 0L) {
+            val realId = Telephony.Threads.getOrCreateThreadId(context, targetAddress)
+            currentThreadId = realId
+            vm.openThread(realId)
+        }
+        vm.refresh()
+    }
+
     // Multi-select (entered from the long-press menu 多选 item).
     var multiSelect by remember { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf(setOf<String>()) }
@@ -521,15 +533,7 @@ fun ThreadDetailScreen(
                         // it to FAILED if the stack reports an error. Runs off
                         // the UI thread because MMS data may need enabling first.
                         val outboxId = -System.currentTimeMillis()
-                        val sentIntent = PendingIntent.getBroadcast(
-                            context,
-                            outboxId.toInt(),
-                            Intent(SmsSentReceiver.ACTION_SMS_SENT)
-                                .setPackage(context.packageName)
-                                .putExtra(SmsSentReceiver.EXTRA_TYPE, "mms")
-                                .putExtra(SmsSentReceiver.EXTRA_RECORD_ID, outboxId),
-                            PendingIntent.FLAG_IMMUTABLE
-                        )
+                        val sentIntent = sendResultIntent(context, "mms", outboxId)
                         val scope2 = scope
                         scope2.launch(Dispatchers.IO) {
                             val sent = MmsSender.send(
@@ -537,14 +541,7 @@ fun ThreadDetailScreen(
                             ) != null
                             withContext(Dispatchers.Main) {
                                 if (sent) {
-                                    pendingAttachment = null
-                                    input = ""
-                                    if (currentThreadId == 0L) {
-                                        val realId = Telephony.Threads.getOrCreateThreadId(context, targetAddress)
-                                        currentThreadId = realId
-                                        vm.openThread(realId)
-                                    }
-                                    vm.refresh()
+                                    afterSendSuccess()
                                 } else {
                                     Toast.makeText(
                                         context,
@@ -559,15 +556,7 @@ fun ThreadDetailScreen(
                         // SMS: insert our own outbox row (the system does not write
                         // one on this ROM), then flip its type via the sent callback.
                         val recordId = vm.insertPendingSms(targetAddress, text)
-                        val sentIntent = PendingIntent.getBroadcast(
-                            context,
-                            recordId.toInt(),
-                            Intent(SmsSentReceiver.ACTION_SMS_SENT)
-                                .setPackage(context.packageName)
-                                .putExtra(SmsSentReceiver.EXTRA_TYPE, "sms")
-                                .putExtra(SmsSentReceiver.EXTRA_RECORD_ID, recordId),
-                            PendingIntent.FLAG_IMMUTABLE
-                        )
+                        val sentIntent = sendResultIntent(context, "sms", recordId)
                         ok = try {
                             val smsManager = if (useSubId > 0) {
                                 SmsManager.getSmsManagerForSubscriptionId(useSubId)
@@ -587,18 +576,7 @@ fun ThreadDetailScreen(
                         }
                     }
                     if (ok) {
-                        pendingAttachment = null
-                        input = ""
-                        if (currentThreadId == 0L) {
-                            // First send from new-thread mode: resolve the
-                            // real thread and open it (updates selectedThreadId
-                            // so the ContentObserver refresh reloads this
-                            // thread instead of the empty thread-0 list).
-                            val realId = Telephony.Threads.getOrCreateThreadId(context, targetAddress)
-                            currentThreadId = realId
-                            vm.openThread(realId)
-                        }
-                        vm.refresh() // ContentObserver also fires; refresh re-loads the thread
+                        afterSendSuccess()
                     }
                 }
             )
@@ -828,6 +806,22 @@ private fun shareText(context: Context, text: String) {
     }
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_chooser_title)))
 }
+
+/**
+ * Send-result callback PendingIntent — shared by the SMS and MMS send
+ * paths (SmsSentReceiver flips the provider row / outbox record on the
+ * delivery result).
+ */
+private fun sendResultIntent(context: Context, type: String, recordId: Long): PendingIntent =
+    PendingIntent.getBroadcast(
+        context,
+        recordId.toInt(),
+        Intent(SmsSentReceiver.ACTION_SMS_SENT)
+            .setPackage(context.packageName)
+            .putExtra(SmsSentReceiver.EXTRA_TYPE, type)
+            .putExtra(SmsSentReceiver.EXTRA_RECORD_ID, recordId),
+        PendingIntent.FLAG_IMMUTABLE
+    )
 
 /**
  * Open the system contact editor pre-filled with this number, so the user

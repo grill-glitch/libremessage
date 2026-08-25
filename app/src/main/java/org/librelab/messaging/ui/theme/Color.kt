@@ -21,19 +21,28 @@ val Pink40 = Color(0xFF7D5260)
  */
 data class AvatarColor(val container: Color, val content: Color)
 
-val AvatarPalette = listOf(
-    AvatarColor(Color(0xFFBBDEFB), Color(0xFF0D47A1)), // blue
-    AvatarColor(Color(0xFFC8E6C9), Color(0xFF1B5E20)), // green
-    AvatarColor(Color(0xFFFFE0B2), Color(0xFFE65100)), // orange
-    AvatarColor(Color(0xFFE1BEE7), Color(0xFF4A148C)), // purple
-    AvatarColor(Color(0xFFF8BBD0), Color(0xFF880E4F)), // pink
-    AvatarColor(Color(0xFFB2EBF2), Color(0xFF006064)), // cyan
-    AvatarColor(Color(0xFFFFCDD2), Color(0xFFB71C1C)), // red
-    AvatarColor(Color(0xFFD7CCC8), Color(0xFF3E2723)), // brown
+/**
+ * Same 8 container/content pairs as ARGB ints — the single source of truth.
+ * The Compose layer converts to [AvatarColor]; the widget layer (RemoteViews,
+ * separate process) consumes the ints directly.
+ */
+data class AvatarArgb(val container: Int, val content: Int)
+
+val AvatarPaletteArgb = listOf(
+    AvatarArgb(0xFFBBDEFB.toInt(), 0xFF0D47A1.toInt()), // blue
+    AvatarArgb(0xFFC8E6C9.toInt(), 0xFF1B5E20.toInt()), // green
+    AvatarArgb(0xFFFFE0B2.toInt(), 0xFFE65100.toInt()), // orange
+    AvatarArgb(0xFFE1BEE7.toInt(), 0xFF4A148C.toInt()), // purple
+    AvatarArgb(0xFFF8BBD0.toInt(), 0xFF880E4F.toInt()), // pink
+    AvatarArgb(0xFFB2EBF2.toInt(), 0xFF006064.toInt()), // cyan
+    AvatarArgb(0xFFFFCDD2.toInt(), 0xFFB71C1C.toInt()), // red
+    AvatarArgb(0xFFD7CCC8.toInt(), 0xFF3E2723.toInt()), // brown
 )
 
+/** Deterministic avatar ARGB colors for a contact key (name or address). */
+fun avatarArgbFor(key: String): AvatarArgb =
+    AvatarPaletteArgb[(key.hashCode() and Int.MAX_VALUE) % AvatarPaletteArgb.size]
+
 /** Deterministic avatar colors for a contact key (name or address). */
-fun avatarColorFor(key: String): AvatarColor {
-    val idx = (key.hashCode() and Int.MAX_VALUE) % AvatarPalette.size
-    return AvatarPalette[idx]
-}
+fun avatarColorFor(key: String): AvatarColor =
+    avatarArgbFor(key).let { AvatarColor(Color(it.container), Color(it.content)) }

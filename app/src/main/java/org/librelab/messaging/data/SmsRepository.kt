@@ -55,66 +55,6 @@ class SmsRepository(private val context: Context) {
             .apply()
     }
 
-    /** Whether ad messages are shown on the 全部 filter (settings). */
-    fun showAdsInAll(): Boolean =
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .getBoolean("show_ads_in_all", false)
-
-    fun setShowAdsInAll(show: Boolean) {
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("show_ads_in_all", show).apply()
-    }
-
-    /** Whether ad-message notifications are muted (default: muted). */
-    fun notifyAds(): Boolean =
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .getBoolean("notify_ads", false)
-
-    fun setNotifyAds(notify: Boolean) {
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("notify_ads", notify).apply()
-    }
-
-    /** Whether incoming code messages auto-copy the code to the clipboard. */
-    fun autoCopyCode(): Boolean =
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .getBoolean("auto_copy_code", true)
-
-    fun setAutoCopyCode(auto: Boolean) {
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("auto_copy_code", auto).apply()
-    }
-
-    /** Anti verification-code-bombing: mute code messages + hide from 全部. */
-    fun antiBomb(): Boolean =
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .getBoolean("anti_bomb", false)
-
-    fun setAntiBomb(on: Boolean) {
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("anti_bomb", on).apply()
-    }
-
-    /** End of the temporary "accept codes" window (epoch millis, 0 = none). */
-    fun antiBombUntil(): Long =
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .getLong("anti_bomb_until", 0L)
-
-    fun setAntiBombUntil(until: Long) {
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .edit().putLong("anti_bomb_until", until).apply()
-    }
-
-    /** Default SIM subscription id for outgoing messages (0 = auto/system). */
-    fun defaultSubId(): Int =
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .getInt("default_sub_id", 0)
-
-    fun setDefaultSubId(subId: Int) {
-        context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
-            .edit().putInt("default_sub_id", subId).apply()
-    }
-
     /** Permanently delete a conversation (all its sms + mms rows). */
     suspend fun deleteThread(threadId: Long): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -291,13 +231,8 @@ class SmsRepository(private val context: Context) {
                 val date = c.getLong(dateCol)
                 val isRead = c.getInt(readCol) != 0
                 val type = c.getInt(typeCol)
-                val isSent = type == Telephony.Sms.MESSAGE_TYPE_SENT
-                val sendStatus = when (type) {
-                    Telephony.Sms.MESSAGE_TYPE_SENT -> SendStatus.SENT
-                    Telephony.Sms.MESSAGE_TYPE_QUEUED, Telephony.Sms.MESSAGE_TYPE_OUTBOX -> SendStatus.SENDING
-                    Telephony.Sms.MESSAGE_TYPE_FAILED -> SendStatus.FAILED
-                    else -> SendStatus.NONE
-                }
+                val isSent = smsIsSent(type)
+                val sendStatus = smsSendStatus(type)
                 val contact = lookupContact(address)
                 val category = SmsParser.classify(body, hasContact = contact != null, archived = uri == archivedUri)
                 out += SmsMessage(
@@ -346,13 +281,8 @@ class SmsRepository(private val context: Context) {
                 val box = c.getInt(boxCol)
                 // box: 1=inbox(received), 2=sent, 4=pending, 5=failed — anything
                 // but 1 is our own outgoing MMS and renders on the sent side.
-                val isSent = box != 1
-                val sendStatus = when (box) {
-                    2 -> SendStatus.SENT
-                    4 -> SendStatus.SENDING
-                    5 -> SendStatus.FAILED
-                    else -> SendStatus.NONE
-                }
+                val isSent = mmsIsSent(box)
+                val sendStatus = mmsSendStatus(box)
                 val isRead = c.getInt(readCol) != 0
                 val parts = readMmsParts(id)
                 // Sent MMS: the peer is the TO (type=151) row — the FROM row
@@ -546,3 +476,36 @@ class SmsRepository(private val context: Context) {
         out
     }
 }
+
+/**
+ * Delivery state from the sms table `type` column.
+ * 2=SENT, 4=QUEUED/6=OUTBOX → SENDING, 5=FAILED, everything else NONE.
+ */
+fun smsSendStatus(type: Int): SendStatus = when (type) {
+    Telephony.Sms.MESSAGE_TYPE_SENT -> SendStatus.SENT
+    Telephony.Sms.MESSAGE_TYPE_QUEUED, Telephony.Sms.MESSAGE_TYPE_OUTBOX -> SendStatus.SENDING
+    Telephony.Sms.MESSAGE_TYPE_FAILED -> SendStatus.FAILED
+    else -> SendStatus.NONE
+}
+
+/**
+ * Delivery state from the mms table `msg_box` column.
+ * 2=sent, 4=pending, 5=failed, everything else NONE.
+ */
+fun mmsSendStatus(box: Int): SendStatus = when (box) {
+    2 -> SendStatus.SENT
+    4 -> SendStatus.SENDING
+    5 -> SendStatus.FAILED
+    else -> SendStatus.NONE
+}
+
+/**
+ * Whether an sms row is our own sent message. NOTE: kept as the original
+ * `type == SENT` semantics (P0-2 in ARCHAEOLOGY.md) — a row this app just
+ * inserted as TYPE=OUTBOX renders as received until the sent callback
+ * flips it. Unify with [mmsIsSent] only after real-device confirmation.
+ */
+fun smsIsSent(type: Int): Boolean = type == Telephony.Sms.MESSAGE_TYPE_SENT
+
+/** Whether an mms row is our own sent message (anything but inbox). */
+fun mmsIsSent(box: Int): Boolean = box != 1

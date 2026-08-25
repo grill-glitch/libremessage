@@ -12,6 +12,7 @@ import android.provider.ContactsContract
 import android.provider.Telephony
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
+import org.librelab.messaging.ui.theme.avatarArgbFor
 
 /**
  * Home-screen widget listing the most recent conversations, mirroring the
@@ -239,34 +240,10 @@ class ListWidgetViewsFactory(
     }
 
     /** Deterministic palette color — same 8-color MD3 palette as the app. */
-    private fun avatarColorForKey(key: String): Int {
-        val palette = intArrayOf(
-            0xFFBBDEFB.toInt(), // blue
-            0xFFC8E6C9.toInt(), // green
-            0xFFFFE0B2.toInt(), // orange
-            0xFFE1BEE7.toInt(), // purple
-            0xFFF8BBD0.toInt(), // pink
-            0xFFB2EBF2.toInt(), // cyan
-            0xFFFFCDD2.toInt(), // red
-            0xFFD7CCC8.toInt()  // brown
-        )
-        return palette[(key.hashCode() and Int.MAX_VALUE) % palette.size]
-    }
+    private fun avatarColorForKey(key: String): Int = avatarArgbFor(key).container
 
     /** Matching dark content color for the avatar letter. */
-    private fun avatarContentForKey(key: String): Int {
-        val palette = intArrayOf(
-            0xFF0D47A1.toInt(), // blue
-            0xFF1B5E20.toInt(), // green
-            0xFFE65100.toInt(), // orange
-            0xFF4A148C.toInt(), // purple
-            0xFF880E4F.toInt(), // pink
-            0xFF006064.toInt(), // cyan
-            0xFFB71C1C.toInt(), // red
-            0xFF3E2723.toInt()  // brown
-        )
-        return palette[(key.hashCode() and Int.MAX_VALUE) % palette.size]
-    }
+    private fun avatarContentForKey(key: String): Int = avatarArgbFor(key).content
 }
 
 /** One conversation row for the widget list. */

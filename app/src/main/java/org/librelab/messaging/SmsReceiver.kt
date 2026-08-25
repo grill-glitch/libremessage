@@ -8,6 +8,7 @@ import android.provider.Telephony
 import android.util.Log
 import org.librelab.messaging.R
 import org.librelab.messaging.data.MessageCategory
+import org.librelab.messaging.data.SettingsStore
 import org.librelab.messaging.data.SmsParser
 import org.librelab.messaging.data.isAntiBombActive
 import org.librelab.messaging.util.copyCodeToClipboard
@@ -43,15 +44,14 @@ class SmsReceiver : BroadcastReceiver() {
         runCatching { CodeWidgetProvider.requestRefresh(context) }
         runCatching { ListWidgetProvider.requestRefresh(context) }
 
-        val prefs = context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
         val category = SmsParser.classify(body, hasContact = false, archived = false)
 
         // Setting: 广告短信静音 (ad messages never pop a notification).
-        val adMuted = category == MessageCategory.AD && !prefs.getBoolean("notify_ads", false)
+        val adMuted = category == MessageCategory.AD && !SettingsStore.notifyAds(context)
         // Anti-bombing: mute code messages (no notification, no auto-copy)
         // until the temporary accept window ends.
-        val antiBomb = prefs.getBoolean("anti_bomb", false)
-        val bombWindow = prefs.getLong("anti_bomb_until", 0L)
+        val antiBomb = SettingsStore.antiBomb(context)
+        val bombWindow = SettingsStore.antiBombUntil(context)
         val bombActive = isAntiBombActive(antiBomb, bombWindow)
         val codeMuted = category == MessageCategory.CODE && bombActive
 
@@ -60,7 +60,7 @@ class SmsReceiver : BroadcastReceiver() {
         }
 
         // Setting: 验证码自动复制 (copy the code to the clipboard silently).
-        if (category == MessageCategory.CODE && !codeMuted && prefs.getBoolean("auto_copy_code", true)) {
+        if (category == MessageCategory.CODE && !codeMuted && SettingsStore.autoCopyCode(context)) {
             SmsParser.extractCode(body)?.let { code ->
                 runCatching { copyCodeToClipboard(context, code, showToast = false) }
                     .onFailure { Log.e("SmsReceiver", "clipboard copy failed", it) }

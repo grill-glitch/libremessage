@@ -127,12 +127,12 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 hasSmsPermission = hasSms,
                 isDefaultSmsApp = isDefault,
-                showAdsInAll = repository.showAdsInAll(),
-                notifyAds = repository.notifyAds(),
-                autoCopyCode = repository.autoCopyCode(),
-                antiBomb = repository.antiBomb(),
-                antiBombUntil = repository.antiBombUntil(),
-                defaultSubId = repository.defaultSubId()
+                showAdsInAll = SettingsStore.showAdsInAll(app),
+                notifyAds = SettingsStore.notifyAds(app),
+                autoCopyCode = SettingsStore.autoCopyCode(app),
+                antiBomb = SettingsStore.antiBomb(app),
+                antiBombUntil = SettingsStore.antiBombUntil(app),
+                defaultSubId = SettingsStore.defaultSubId(app)
             )
         }
         if (!hasSms) {
@@ -214,45 +214,45 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 全部标签是否显示广告短信(设置项,持久化)。 */
     fun setShowAdsInAll(show: Boolean) {
-        repository.setShowAdsInAll(show)
+        SettingsStore.setShowAdsInAll(getApplication(), show)
         _state.update { it.copy(showAdsInAll = show) }
     }
 
     /** 广告短信是否弹通知(设置项;默认静音)。 */
     fun setNotifyAds(notify: Boolean) {
-        repository.setNotifyAds(notify)
+        SettingsStore.setNotifyAds(getApplication(), notify)
         _state.update { it.copy(notifyAds = notify) }
     }
 
     /** 验证码短信自动复制到剪贴板(设置项)。 */
     fun setAutoCopyCode(auto: Boolean) {
-        repository.setAutoCopyCode(auto)
+        SettingsStore.setAutoCopyCode(getApplication(), auto)
         _state.update { it.copy(autoCopyCode = auto) }
     }
 
     /** 防验证码轰炸:静音验证码 + 全部标签列表隐藏(首页 banner 保留)。 */
     fun setAntiBomb(on: Boolean) {
-        repository.setAntiBomb(on)
+        SettingsStore.setAntiBomb(getApplication(), on)
         _state.update { it.copy(antiBomb = on) }
     }
 
     /** 临时接收验证码 1 分钟(倒计时窗口)。 */
     fun temporarilyUnmuteCodes() {
         val until = System.currentTimeMillis() + 60_000L
-        repository.setAntiBombUntil(until)
+        SettingsStore.setAntiBombUntil(getApplication(), until)
         _state.update { it.copy(antiBombUntil = until) }
     }
 
     /** 临时窗口再 +1 分钟。 */
     fun extendUnmuteCodes() {
         val until = maxOf(_state.value.antiBombUntil, System.currentTimeMillis()) + 60_000L
-        repository.setAntiBombUntil(until)
+        SettingsStore.setAntiBombUntil(getApplication(), until)
         _state.update { it.copy(antiBombUntil = until) }
     }
 
     /** 立即恢复静音(结束临时窗口)。 */
     fun restoreCodeMute() {
-        repository.setAntiBombUntil(0L)
+        SettingsStore.setAntiBombUntil(getApplication(), 0L)
         _state.update { it.copy(antiBombUntil = 0L) }
     }
 
@@ -269,7 +269,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 默认电话卡(设置项,0 = 无/系统自动)。 */
     fun setDefaultSubId(subId: Int) {
-        repository.setDefaultSubId(subId)
+        SettingsStore.setDefaultSubId(getApplication(), subId)
         _state.update { it.copy(defaultSubId = subId) }
     }
 

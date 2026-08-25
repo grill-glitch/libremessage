@@ -58,14 +58,14 @@ class ListWidgetProvider : AppWidgetProvider() {
         // FAB -> new-message draft (same action as the launcher shortcut).
         views.setOnClickPendingIntent(
             R.id.widget_new_msg,
-            openApp(context, 1, "org.librelab.messaging.action.NEW_MESSAGE", -1L)
+            openApp(context, 1, MainActivity.ACTION_NEW_MESSAGE, -1L)
         )
 
         // Row tap -> open the thread. The template must be MUTABLE so the
         // per-row fill-in extras (thread id) actually merge into the final
         // intent. (FLAG_IMMUTABLE silently drops them.)
         val rowTemplate = Intent(context, MainActivity::class.java).apply {
-            action = "org.librelab.messaging.action.OPEN_THREAD"
+            action = MainActivity.ACTION_OPEN_THREAD
         }
         views.setPendingIntentTemplate(
             R.id.widget_list_view,
@@ -81,7 +81,7 @@ class ListWidgetProvider : AppWidgetProvider() {
 
     private fun openApp(context: Context, requestCode: Int, action: String, threadId: Long): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).setAction(action)
-        if (threadId > 0) intent.putExtra("threadId", threadId)
+        if (threadId > 0) intent.putExtra(MainActivity.EXTRA_THREAD_ID, threadId)
         return PendingIntent.getActivity(
             context,
             requestCode,
@@ -146,7 +146,7 @@ class ListWidgetViewsFactory(
         // Per-row fill-in: only the thread id (no component/action — those
         // come from the template).
         val fillIn = Intent().apply {
-            putExtra("threadId", row.threadId)
+            putExtra(MainActivity.EXTRA_THREAD_ID, row.threadId)
         }
         views.setOnClickFillInIntent(R.id.widget_row_root, fillIn)
         return views

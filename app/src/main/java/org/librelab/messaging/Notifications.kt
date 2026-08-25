@@ -41,9 +41,12 @@ object Notifications {
 
         val contentIntent = PendingIntent.getActivity(
             context, 0,
-            Intent(context, MainActivity::class.java).addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            ),
+            Intent(context, MainActivity::class.java)
+                .setAction(MainActivity.ACTION_OPEN_THREAD)
+                .putExtra(MainActivity.EXTRA_ADDRESS, address)
+                .addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                ),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -81,8 +84,11 @@ object Notifications {
             return
         }
         ensureChannel(context)
+        // requestCode 1: distinct from the incoming-SMS content intent
+        // (requestCode 0 + FLAG_UPDATE_CURRENT would otherwise overwrite
+        // its extras, breaking the tap-to-open-conversation flow).
         val contentIntent = PendingIntent.getActivity(
-            context, 0,
+            context, 1,
             Intent(context, MainActivity::class.java).addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             ),

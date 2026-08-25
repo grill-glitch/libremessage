@@ -118,8 +118,8 @@ class CodeWidgetProvider : AppWidgetProvider() {
     private fun wireOpenApp(views: RemoteViews, context: Context, card: SmsMessage?) {
         val action = when {
             card == null -> ""
-            card.isPickupCode -> "org.librelab.messaging.action.OPEN_PICKUPS"
-            else -> "org.librelab.messaging.action.OPEN_CODES"
+            card.isPickupCode -> MainActivity.ACTION_OPEN_PICKUPS
+            else -> MainActivity.ACTION_OPEN_CODES
         }
         val open = PendingIntent.getActivity(
             context,

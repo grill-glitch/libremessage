@@ -104,7 +104,9 @@ import org.librelab.messaging.data.SmsFilter
 import org.librelab.messaging.data.SimCard
 import org.librelab.messaging.data.SmsMessage
 import org.librelab.messaging.data.SmsThreadItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.data.UiState
 import org.librelab.messaging.ui.components.ConfirmDialog
@@ -151,33 +153,52 @@ fun MainScreen(
     initialThreadId: Long = -1L
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     // Deep-link: launch straight into a new-conversation draft when the
     // activity was started with a number/body/attachment (share intent),
     // or into the matching filter tab via a launcher shortcut (2 = codes,
-    // 3 = pickups), or a specific thread from a widget row tap (4).
+    // 3 = pickups), or a specific thread from a widget row tap (4) or an
+    // incoming-SMS notification tap (4 + address).
     //
     // Keyed on the launch params (not Unit): onNewIntent re-composes
     // MainScreen with new values, and this must re-run to navigate.
-    LaunchedEffect(shortcutTarget, initialThreadId) {
-        if (shortcutTarget == 1 ||
-            initialNumber.isNotBlank() || initialBody.isNotBlank() || initialAttachmentUri.isNotBlank()
-        ) {
-            navController.navigate(
+    LaunchedEffect(shortcutTarget, initialThreadId, initialNumber) {
+        when {
+            // Launcher shortcut "new message": always a fresh draft.
+            shortcutTarget == 1 -> navController.navigate(
                 ThreadRoute(0L, initialNumber, "", initialAttachmentUri, initialBody)
             )
-        } else if (shortcutTarget == 2) {
-            vm.setFilter(SmsFilter.CODE)
-        } else if (shortcutTarget == 3) {
-            vm.setFilter(SmsFilter.PACKAGE)
-        } else if (shortcutTarget == 4 && initialThreadId > 0) {
-            navController.navigate(ThreadRoute(initialThreadId, "", ""))
-        } else {
+            shortcutTarget == 2 -> vm.setFilter(SmsFilter.CODE)
+            shortcutTarget == 3 -> vm.setFilter(SmsFilter.PACKAGE)
+            // Widget row tap (threadId) or notification tap (address).
+            shortcutTarget == 4 -> {
+                val tid = if (initialThreadId > 0) {
+                    initialThreadId
+                } else {
+                    withContext(Dispatchers.IO) {
+                        Telephony.Threads.getOrCreateThreadId(context, initialNumber)
+                    }
+                }
+                if (tid > 0) {
+                    navController.navigate(ThreadRoute(tid, initialNumber, ""))
+                } else {
+                    navController.navigate(HomeRoute) {
+                        popUpTo(navController.graph.id) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            }
+            // smsto:/share intents carry a number, body and/or attachment.
+            initialNumber.isNotBlank() || initialBody.isNotBlank() || initialAttachmentUri.isNotBlank() ->
+                navController.navigate(
+                    ThreadRoute(0L, initialNumber, "", initialAttachmentUri, initialBody)
+                )
             // Plain launch (app icon, widget header / "more" link): come
             // back to the home conversation list. Without this, a warm
             // start while a thread is open would stay on that thread and
             // the widget "more" link would appear dead.
-            navController.navigate(HomeRoute) {
+            else -> navController.navigate(HomeRoute) {
                 popUpTo(navController.graph.id) { inclusive = false }
                 launchSingleTop = true
             }

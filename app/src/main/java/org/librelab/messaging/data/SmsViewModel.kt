@@ -42,41 +42,11 @@ data class UiState(
     val latestCode: SmsMessage?
         get() = allCodeEntries.maxByOrNull { it.date }
 
-    /** Latest express pickup message (used under the 包裹 filter). */
-    val latestPickup: SmsMessage?
-        get() = allPickups.maxByOrNull { it.date }
-
-    /** Express pickup entries (one per cabinet number), for the 包裹 banner. */
-    val allPickups: List<SmsMessage>
-        get() = pickupMessages
-            .flatMap { msg ->
-                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
-            }
-            .sortedByDescending { it.date }
-
     /** All code + express messages for the expanded list. Express messages
      * are split per cabinet number: 【多多代收点】…取货码1-3-9448、5-4-3216
      * yields two entries (one per parcel). */
     val allCodeEntries: List<SmsMessage>
-        get() = messages.filter { it.category == MessageCategory.CODE || it.category == MessageCategory.PACKAGE }
-            .flatMap { msg ->
-                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
-            }
-            .sortedByDescending { it.date }
-
-    /** Pure verification codes (no pickup codes) — the 验证码 filter list. */
-    val codeEntries: List<SmsMessage>
-        get() = messages.filter { it.category == MessageCategory.CODE }
-            .flatMap { msg ->
-                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
-            }
-            .sortedByDescending { it.date }
-
-    private val codeMessages: List<SmsMessage>
-        get() = messages.filter { it.category == MessageCategory.CODE }
-
-    private val pickupMessages: List<SmsMessage>
-        get() = messages.filter { it.category == MessageCategory.PACKAGE }
+        get() = codeEntries(messages, setOf(MessageCategory.CODE, MessageCategory.PACKAGE))
 
     /** Messages after applying filter chip + search query. */
     val visibleMessages: List<SmsMessage>
@@ -94,7 +64,7 @@ data class UiState(
         val hideAdsInAll = f == SmsFilter.ALL && !showAdsInAll
         // 防验证码轰炸:验证码从全部列表隐藏,但首页 banner 保留
         // (banner 数据源 allCodeEntries 不走这里);临时接收窗口内恢复。
-        val antiBombActive = antiBomb && System.currentTimeMillis() > antiBombUntil
+        val antiBombActive = isAntiBombActive(antiBomb, antiBombUntil)
         return messages.filter { m ->
             (!hideAdsInAll || m.category != MessageCategory.AD) &&
                 (!(antiBombActive && f == SmsFilter.ALL) || m.category != MessageCategory.CODE) &&
@@ -108,44 +78,22 @@ data class UiState(
      * [filter] so pager pages render instantly.
      */
     fun threadsFor(f: SmsFilter): List<SmsThreadItem> =
-        messagesFor(f)
-            .groupBy { if (it.threadId != 0L) it.threadId else it.address.hashCode().toLong() }
-            .values
-            .map { group ->
-                val latest = group.maxByOrNull { it.date }!!
-                SmsThreadItem(latest, group.count { !it.isRead }, group.size)
-            }
-            .sortedByDescending { it.message.date }
+        groupThreads(messagesFor(f))
 
     /** Pure verification codes (no pickup codes) — the 验证码 filter list. */
     fun codesFor(): List<SmsMessage> =
-        messages.filter { it.category == MessageCategory.CODE }
-            .flatMap { msg ->
-                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
-            }
-            .sortedByDescending { it.date }
+        codeEntries(messages, setOf(MessageCategory.CODE))
 
     /** Express pickup entries for the 包裹 filter. */
     fun pickupsFor(): List<SmsMessage> =
-        messages.filter { it.category == MessageCategory.PACKAGE }
-            .flatMap { msg ->
-                SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
-            }
-            .sortedByDescending { it.date }
+        codeEntries(messages, setOf(MessageCategory.PACKAGE))
 
     /**
      * Conversation rows: filter at message level, then group by thread
      * (fallback: address) so each sender occupies exactly one list row.
      */
     val visibleThreads: List<SmsThreadItem>
-        get() = visibleMessages
-            .groupBy { if (it.threadId != 0L) it.threadId else it.address.hashCode().toLong() }
-            .values
-            .map { group ->
-                val latest = group.maxByOrNull { it.date }!!
-                SmsThreadItem(latest, group.count { !it.isRead }, group.size)
-            }
-            .sortedByDescending { it.message.date }
+        get() = groupThreads(visibleMessages)
 }
 
 class SmsViewModel(application: Application) : AndroidViewModel(application) {

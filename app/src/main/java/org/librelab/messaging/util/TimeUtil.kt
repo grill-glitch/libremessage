@@ -37,3 +37,10 @@ fun formatRelativeTime(context: Context, dateMillis: Long, now: Long = System.cu
         ).format(Date(dateMillis))
     }
 }
+
+/**
+ * Absolute bubble time "HH:mm" (conversation bubbles). Extracted from
+ * ThreadDetailScreen so the same format is used everywhere; locale-aware.
+ */
+fun formatBubbleTime(dateMillis: Long): String =
+    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(dateMillis))

@@ -150,51 +150,41 @@ object MmsSender {
 
     /** Downscale to MAX_DIMENSION and re-encode as JPEG (MMS size limits). */
     private fun imageBytes(src: File): ByteArray {
-        val bmp = BitmapFactory.decodeFile(src.absolutePath) ?: return src.readBytes()
-        val w = bmp.width
-        val h = bmp.height
-        val scale = minOf(1f, MAX_DIMENSION.toFloat() / maxOf(w, h))
-        val out = if (scale < 1f) {
-            Bitmap.createScaledBitmap(
-                bmp,
-                (w * scale).toInt().coerceAtLeast(1),
-                (h * scale).toInt().coerceAtLeast(1),
-                true
-            )
-        } else {
-            bmp
-        }
+        val scaled = decodeScaled(src) ?: return src.readBytes()
         return try {
             val bos = java.io.ByteArrayOutputStream()
-            out.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, bos)
+            scaled.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, bos)
             bos.toByteArray()
         } finally {
-            if (out !== bmp) out.recycle()
-            bmp.recycle()
+            scaled.recycle()
         }
     }
 
     /** Downscale to MAX_DIMENSION and re-encode as JPEG (MMS size limits). */
     private fun compressImage(src: File, dst: File) {
-        val bmp = BitmapFactory.decodeFile(src.absolutePath) ?: return
+        val scaled = decodeScaled(src) ?: return
+        try {
+            dst.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
+        } finally {
+            scaled.recycle()
+        }
+    }
+
+    /** Decode + downscale to [MAX_DIMENSION] on the longest side.
+     * Returns null when [src] is not decodable as an image. */
+    private fun decodeScaled(src: File): Bitmap? {
+        val bmp = BitmapFactory.decodeFile(src.absolutePath) ?: return null
         val w = bmp.width
         val h = bmp.height
         val scale = minOf(1f, MAX_DIMENSION.toFloat() / maxOf(w, h))
-        val out = if (scale < 1f) {
-            Bitmap.createScaledBitmap(
-                bmp,
-                (w * scale).toInt().coerceAtLeast(1),
-                (h * scale).toInt().coerceAtLeast(1),
-                true
-            )
-        } else {
-            bmp
-        }
-        try {
-            dst.outputStream().use { out.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
-        } finally {
-            if (out !== bmp) out.recycle()
-            bmp.recycle()
-        }
+        if (scale >= 1f) return bmp
+        val out = Bitmap.createScaledBitmap(
+            bmp,
+            (w * scale).toInt().coerceAtLeast(1),
+            (h * scale).toInt().coerceAtLeast(1),
+            true
+        )
+        bmp.recycle()
+        return out
     }
 }

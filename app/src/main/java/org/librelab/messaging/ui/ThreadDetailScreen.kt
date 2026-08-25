@@ -130,13 +130,11 @@ import org.librelab.messaging.ui.theme.AvatarColor
 import org.librelab.messaging.ui.theme.avatarColorFor
 import org.librelab.messaging.util.MmsSender
 import org.librelab.messaging.util.OutboxStore
+import org.librelab.messaging.util.formatBubbleTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Conversation detail: received bubbles on the left, sent on the right,
@@ -935,7 +933,7 @@ private fun MessageBubble(
     onSaveImage: (android.net.Uri) -> Unit,
     onDelete: (SmsMessage) -> Unit
 ) {
-    val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.date))
+    val time = formatBubbleTime(message.date)
     val hasImages = message.imageUris.isNotEmpty() || message.attachmentName != null
     var confirmDelete by remember { mutableStateOf(false) }
     if (message.isSent) {

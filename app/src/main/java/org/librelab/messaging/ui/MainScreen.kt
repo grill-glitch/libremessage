@@ -16,8 +16,6 @@ import com.composables.icons.materialsymbols.outlined.Settings
 import android.Manifest
 import android.net.Uri
 import android.app.role.RoleManager
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -114,6 +112,7 @@ import org.librelab.messaging.data.SmsThreadItem
 import kotlinx.coroutines.launch
 import org.librelab.messaging.data.SmsViewModel
 import org.librelab.messaging.data.UiState
+import org.librelab.messaging.util.copyCodeToClipboard
 
 private data class ComposeTarget(val number: String, val body: String)
 
@@ -1226,8 +1225,4 @@ private fun defaultSmsRequestIntent(context: Context): Intent? {
     return legacy.takeIf { it.resolveActivity(context.packageManager) != null }
 }
 
-private fun copyCode(context: Context, code: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("sms_code", code))
-    Toast.makeText(context, R.string.toast_code_copied, Toast.LENGTH_SHORT).show()
-}
+private fun copyCode(context: Context, code: String) = copyCodeToClipboard(context, code)

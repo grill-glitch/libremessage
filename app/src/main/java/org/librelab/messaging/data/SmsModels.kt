@@ -65,6 +65,15 @@ enum class SmsFilter(@StringRes val labelRes: Int) {
 /** Delivery state of an outgoing message, driven by the sms `type` / mms `msg_box`. */
 enum class SendStatus { NONE, SENDING, SENT, FAILED }
 
+/**
+ * Anti verification-code-bombing active state: the switch is on AND the
+ * temporary accept window (if any) has expired. One rule shared by the
+ * receiver (notification/copy gating) and the UI (list filtering) so both
+ * decide from the same logic.
+ */
+fun isAntiBombActive(antiBomb: Boolean, until: Long, now: Long = System.currentTimeMillis()): Boolean =
+    antiBomb && now > until
+
 /** One active SIM card: subscription id + display name (for the picker). */
 data class SimCard(
     val subId: Int,
@@ -128,3 +137,18 @@ data class SmsThreadItem(
     val unreadCount: Int,
     val totalCount: Int
 )
+
+/**
+ * Conversation rows: group messages by thread (fallback: address when the
+ * provider row has no thread id) so each sender occupies exactly one list
+ * row; the latest message drives the row, unread/total counts aggregate.
+ */
+fun groupThreads(messages: List<SmsMessage>): List<SmsThreadItem> =
+    messages
+        .groupBy { if (it.threadId != 0L) it.threadId else it.address.hashCode().toLong() }
+        .values
+        .map { group ->
+            val latest = group.maxByOrNull { it.date }!!
+            SmsThreadItem(latest, group.count { !it.isRead }, group.size)
+        }
+        .sortedByDescending { it.message.date }

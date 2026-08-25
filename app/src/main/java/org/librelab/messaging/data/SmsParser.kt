@@ -302,3 +302,16 @@ object SmsParser {
         return sb.toString()
     }
 }
+
+/**
+ * The code/express-entry pipeline shared by the banner and the 验证码/包裹
+ * filter lists: keep messages of the wanted categories, split each message
+ * into one entry per code (express SMS can carry several cabinet numbers),
+ * newest first.
+ */
+fun codeEntries(messages: List<SmsMessage>, categories: Set<MessageCategory>): List<SmsMessage> =
+    messages.filter { it.category in categories }
+        .flatMap { msg ->
+            SmsParser.extractAllCodes(msg.body).map { code -> msg.copy(code = code) }
+        }
+        .sortedByDescending { it.date }

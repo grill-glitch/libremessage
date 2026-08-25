@@ -32,26 +32,7 @@ object OutboxStore {
     fun add(context: Context, record: OutboxMms) {
         val list = all(context).toMutableList()
         list.add(record)
-        val arr = JSONArray()
-        list.forEach { r ->
-            arr.put(
-                JSONObject()
-                    .put("id", r.id)
-                    .put("threadId", r.threadId)
-                    .put("address", r.address)
-                    .put("text", r.text)
-                    .put("imagePath", r.imagePath)
-                    .put("date", r.date)
-                    .put("failed", r.failed)
-                    .put("name", r.name ?: "")
-                    .put("mime", r.mime ?: "")
-            )
-        }
-        try {
-            file(context).writeText(arr.toString())
-        } catch (e: Exception) {
-            android.util.Log.e("OutboxStore", "write failed", e)
-        }
+        write(context, list)
     }
 
     fun all(context: Context): List<OutboxMms> {
@@ -111,6 +92,8 @@ object OutboxStore {
                     .put("imagePath", r.imagePath)
                     .put("date", r.date)
                     .put("failed", r.failed)
+                    .put("name", r.name ?: "")
+                    .put("mime", r.mime ?: "")
             )
         }
         return arr

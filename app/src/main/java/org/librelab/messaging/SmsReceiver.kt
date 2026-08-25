@@ -9,6 +9,8 @@ import android.util.Log
 import org.librelab.messaging.R
 import org.librelab.messaging.data.MessageCategory
 import org.librelab.messaging.data.SmsParser
+import org.librelab.messaging.data.isAntiBombActive
+import org.librelab.messaging.util.copyCodeToClipboard
 
 /**
  * Receives incoming SMS. SMS_RECEIVED is broadcast to every receiver (used
@@ -50,7 +52,7 @@ class SmsReceiver : BroadcastReceiver() {
         // until the temporary accept window ends.
         val antiBomb = prefs.getBoolean("anti_bomb", false)
         val bombWindow = prefs.getLong("anti_bomb_until", 0L)
-        val bombActive = antiBomb && System.currentTimeMillis() > bombWindow
+        val bombActive = isAntiBombActive(antiBomb, bombWindow)
         val codeMuted = category == MessageCategory.CODE && bombActive
 
         if (!adMuted && !codeMuted) {
@@ -60,13 +62,8 @@ class SmsReceiver : BroadcastReceiver() {
         // Setting: 验证码自动复制 (copy the code to the clipboard silently).
         if (category == MessageCategory.CODE && !codeMuted && prefs.getBoolean("auto_copy_code", true)) {
             SmsParser.extractCode(body)?.let { code ->
-                try {
-                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                        as android.content.ClipboardManager
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("code", code))
-                } catch (e: Exception) {
-                    Log.e("SmsReceiver", "clipboard copy failed", e)
-                }
+                runCatching { copyCodeToClipboard(context, code, showToast = false) }
+                    .onFailure { Log.e("SmsReceiver", "clipboard copy failed", it) }
             }
         }
     }

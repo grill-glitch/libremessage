@@ -137,7 +137,8 @@ import java.io.File
 
 /**
  * Conversation detail: received bubbles on the left, sent on the right,
- * auto-scroll to the newest message, bottom input bar sends via SmsManager.
+ * auto-scroll to the newest message, bottom input bar sends via
+ * [org.librelab.messaging.data.MessageSender].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

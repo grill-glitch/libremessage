@@ -44,6 +44,61 @@ Google 专有代码。
 
 APK 输出:`app/build/outputs/apk/release/app-release.apk`
 
+## ROM 集成(Soong)
+
+LibreMessage 可以预装进自定义 ROM(crDroid / LineageOS / AOSP)作为系统
+应用。应用本体是 Jetpack Compose 项目,而 Soong 没有 Compose/Coil 的构建
+支持 —— 因此 ROM 通过 `android_app_import` 直接消费签名后的 release APK,
+与其他 Compose 系统应用的做法一致。集成文件位于**仓库根目录**:
+`Android.bp` + `LibreMessage.apk`(签名 release APK,当前 v1.3.5)。
+
+### 加入 ROM 树
+
+1. **local manifest** — 把本仓库 checkout 到 `packages/apps/LibreMessage`:
+
+   ```xml
+   <!-- .repo/local_manifests/libremessage.xml -->
+   <manifest>
+     <project name="grill-glitch/libremessage"
+              path="packages/apps/LibreMessage"
+              remote="github"
+              revision="main" />
+   </manifest>
+   ```
+
+   然后执行 `repo sync -c --force-sync --no-tags -j4 packages/apps/LibreMessage`
+
+2. **产品包** — 在 `device/<厂商>/<设备>/device.mk` 中添加:
+
+   ```makefile
+   # LibreMessage — 默认短信应用
+   PRODUCT_PACKAGES += \
+       LibreMessage
+   ```
+
+3. **构建**(示例:crDroid 16,Redmi 12C / earth):
+
+   ```bash
+   source build/envsetup.sh
+   lunch lineage_earth-bp4a-userdebug
+   m LibreMessage        # 单模块;`m bacon` 构建完整 ROM
+   ```
+
+   产物:`out/target/product/<设备>/system/app/LibreMessage/`
+
+### 说明
+
+- **签名**:APK 使用开发者 release 签名(`presigned: true` +
+  `preprocessed: true`)。已安装 release 版的设备升级 ROM 无需清除数据,
+  app 仍可独立更新。Compose 带入的 `androidx.window.*` uses-library
+  标记通过 `optional_uses_libs` 处理。
+- **默认短信应用**:Android 16 已移除 `config_defaultSmsApp` 机制,首次
+  开机不会自动分配角色。需在 设置 → 默认应用 → 短信应用 手动选择一次
+  (或首次收发短信时按系统提示选择)。
+- **更新预装包**:构建新版本(`./gradlew :app:assembleRelease`)后把 APK
+  复制覆盖仓库根的 `LibreMessage.apk`,提交推送,然后在 ROM 树中
+  `repo sync` 即可。
+
 ## 致谢
 
 `SmsParser` 中的匹配规则参考了两个开源项目:

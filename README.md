@@ -55,6 +55,64 @@ conversation list — next to the home-screen conversations widget.
 
 APK output: `app/build/outputs/apk/release/app-release.apk`
 
+## ROM integration (Soong)
+
+LibreMessage can be built into a custom ROM (crDroid / LineageOS / AOSP)
+as a prebuilt system app. The app itself is a Jetpack Compose project, and
+Soong has no Compose/Coil build support — so the ROM consumes the signed
+release APK via `android_app_import`, exactly like other Compose system
+apps. The integration lives at the **repo root**: `Android.bp` +
+`LibreMessage.apk` (the signed release APK, currently v1.3.5).
+
+### Add to the ROM tree
+
+1. **local manifest** — checkout this repo into `packages/apps/LibreMessage`:
+
+   ```xml
+   <!-- .repo/local_manifests/libremessage.xml -->
+   <manifest>
+     <project name="grill-glitch/libremessage"
+              path="packages/apps/LibreMessage"
+              remote="github"
+              revision="main" />
+   </manifest>
+   ```
+
+   then `repo sync -c --force-sync --no-tags -j4 packages/apps/LibreMessage`
+
+2. **Product packages** — in `device/<oem>/<device>/device.mk`:
+
+   ```makefile
+   # LibreMessage — default SMS application
+   PRODUCT_PACKAGES += \
+       LibreMessage
+   ```
+
+3. **Build** (example for crDroid 16, Redmi 12C / earth):
+
+   ```bash
+   source build/envsetup.sh
+   lunch lineage_earth-bp4a-userdebug
+   m LibreMessage        # single module; `m bacon` builds the full ROM
+   ```
+
+   Output: `out/target/product/<device>/system/app/LibreMessage/`
+
+### Notes
+
+- **Signature**: the APK ships with the developer's release signature
+  (`presigned: true` + `preprocessed: true`). Devices that already run the
+  release APK upgrade to the ROM build without wiping data, and the app
+  stays updatable as a regular app. The `androidx.window.*` uses-library
+  tags pulled in by Compose are handled via `optional_uses_libs`.
+- **Default SMS app**: Android 16 removed the `config_defaultSmsApp`
+  mechanism, so the role is not pre-assigned at first boot. Set it once in
+  Settings → Default apps → SMS app (or answer the system prompt on the
+  first message).
+- **Updating the prebuilt**: build a new release
+  (`./gradlew :app:assembleRelease`), copy the APK over `LibreMessage.apk`
+  in the repo root, commit, push, then `repo sync` in the ROM tree.
+
 ## Credits
 
 Matching rules in `SmsParser` draw on two open-source projects:

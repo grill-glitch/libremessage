@@ -467,7 +467,7 @@ ThreadDetail: multiSelect + selectedKeys + allSelected + exitMultiSelect (Thread
 | # | 问题 | 证据 | 风险 |
 |---|---|---|---|
 | P0-1 | **OutboxStore 序列化丢字段**:`mark()/remove()` 走 `write→toJson()`,而 `toJson` **不含 `name`/`mime`**(`OutboxStore.kt:102-117`),只有 `add()` 内联版有。发送失败标记或删除任一 MMS 记录后,整个列表的附件名/类型被清空 → 已发送文件附件变成无名字卡 | `OutboxStore.kt:32-55 vs 102-117` | 数据错误,用户可见 |
-| P0-2 | **SMS 发送中消息渲染在接收侧**:`insertPendingSms` 写 TYPE=6,`query()` 的 `isSent = type == MESSAGE_TYPE_SENT`(`SmsRepository.kt:294`)→ OUTBOX 行 isSent=false → 左侧渲染;MMS outbox 恒 isSent=true → 右侧。同一"我的发送"两种 UI 行为 | §7.1 | 行为不一致,需真机确认 |
+| P0-2 | **SMS 发送中消息渲染在接收侧**:`insertPendingSms` 写 TYPE=6,`query()` 的 `isSent = type == MESSAGE_TYPE_SENT`(`SmsRepository.kt:294`)→ OUTBOX 行 isSent=false → 左侧渲染;MMS outbox 恒 isSent=true → 右侧。同一"我的发送"两种 UI 行为 | §7.1 | ~~行为不一致~~ **已解决(4.4)**:smsIsSent 统一为 SENT/QUEUED/OUTBOX → 右侧 + SENDING 图标,与 MMS 对齐 |
 | P0-3 | **LazyColumn key 冲突风险**:HomeScreen `items(key = threadId)`(`MainScreen.kt:776/864`);`threadsFor` 分组对 threadId=0 有 address 回退(`SmsViewModel.kt:112`),但 item key 仍用**原始 threadId** — 两条不同地址的 threadId=0 消息会生成重复 key → `IllegalArgumentException` | `SmsViewModel.kt:112` vs `MainScreen.kt:776` | 潜在 crash(取决于 provider 数据) |
 | P0-4 | **删除线程不清理 OutboxStore**:`deleteThread`(`SmsRepository.kt:119-135`)只删 provider 行;该线程的 MMS outbox 记录仍在 `loadAll` → 幽灵会话 | `SmsRepository.kt:119` vs `ThreadDetailScreen.kt:775` | 数据残留 |
 

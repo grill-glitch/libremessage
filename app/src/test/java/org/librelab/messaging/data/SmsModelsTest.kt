@@ -136,10 +136,14 @@ class SmsModelsTest {
 
     @Test
     fun sentFlagSemantics() {
-        // P0-2 guard: sms OUTBOX rows are NOT flagged sent (original
-        // behaviour); mms anything-but-inbox IS sent.
-        assertTrue(smsIsSent(2))
-        assertFalse(smsIsSent(6))
+        // P0-2 resolved: sms OUTBOX/QUEUED rows are flagged sent (render
+        // on the right with the SENDING icon), matching mms semantics —
+        // the OUTBOX row inserted before handing off to SmsManager is
+        // immediately visible as our own send.
+        assertTrue(smsIsSent(2))   // MESSAGE_TYPE_SENT
+        assertTrue(smsIsSent(4))   // MESSAGE_TYPE_QUEUED
+        assertTrue(smsIsSent(6))   // MESSAGE_TYPE_OUTBOX
+        assertFalse(smsIsSent(1))  // inbox
         assertFalse(mmsIsSent(1))
         assertTrue(mmsIsSent(2))
         assertTrue(mmsIsSent(4))

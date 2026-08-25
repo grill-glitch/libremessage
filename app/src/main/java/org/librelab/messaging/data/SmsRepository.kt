@@ -509,12 +509,18 @@ fun mmsSendStatus(box: Int): SendStatus = when (box) {
 }
 
 /**
- * Whether an sms row is our own sent message. NOTE: kept as the original
- * `type == SENT` semantics (P0-2 in ARCHAEOLOGY.md) — a row this app just
- * inserted as TYPE=OUTBOX renders as received until the sent callback
- * flips it. Unify with [mmsIsSent] only after real-device confirmation.
+ * Whether an sms row is our own sent message. Unifies the sms `type`
+ * semantics with the mms `msg_box` (anything but inbox is outgoing):
+ * SENT, QUEUED and OUTBOX rows all render on the sent side — the OUTBOX
+ * row this app inserts before handing the message to SmsManager shows up
+ * immediately on the right with the SENDING icon (P0-2 resolved).
  */
-fun smsIsSent(type: Int): Boolean = type == Telephony.Sms.MESSAGE_TYPE_SENT
+fun smsIsSent(type: Int): Boolean = when (type) {
+    Telephony.Sms.MESSAGE_TYPE_SENT,
+    Telephony.Sms.MESSAGE_TYPE_QUEUED,
+    Telephony.Sms.MESSAGE_TYPE_OUTBOX -> true
+    else -> false
+}
 
 /** Whether an mms row is our own sent message (anything but inbox). */
 fun mmsIsSent(box: Int): Boolean = box != 1

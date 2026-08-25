@@ -12,6 +12,8 @@ import android.provider.ContactsContract
 import android.provider.Telephony
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
+import org.librelab.messaging.data.normalizeNumber
+import org.librelab.messaging.data.redactedMatches
 import org.librelab.messaging.ui.theme.avatarArgbFor
 
 /**
@@ -212,9 +214,15 @@ class ListWidgetViewsFactory(
 
     private fun nameFor(address: String): String? {
         contactCache[address]?.let { return it }
-        val digits = address.filter { it.isDigit() }
         var name: String? = null
         try {
+            // Same matching rules as the app's SmsRepository: normalized
+            // exact match first, then the redacted-address fallback (the
+            // SMS table may hold masked numbers like "+861****3748"),
+            // adopted only when exactly one contact matches. Keeping the
+            // two processes on one algorithm avoids name mismatches
+            // between the widget and the app list.
+            val index = HashMap<String, String>() // normalized number -> name
             resolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                 arrayOf(
@@ -225,12 +233,19 @@ class ListWidgetViewsFactory(
             )?.use { c ->
                 val nameCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
                 val numCol = c.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                while (c.moveToNext() && name == null) {
+                while (c.moveToNext()) {
                     val num = c.getString(numCol) ?: continue
-                    if (num.filter { it.isDigit() }.endsWith(digits.takeLast(7))) {
-                        name = c.getString(nameCol)
+                    val key = normalizeNumber(num)
+                    if (key.isNotEmpty() && !index.containsKey(key)) {
+                        index[key] = c.getString(nameCol)
                     }
                 }
+            }
+            val key = normalizeNumber(address)
+            name = index[key]
+            if (name == null && key.length < 11) {
+                val candidates = index.keys.filter { redactedMatches(key, it) }
+                if (candidates.size == 1) name = index[candidates[0]]
             }
         } catch (e: Exception) {
             // no READ_CONTACTS permission or provider error: show the number

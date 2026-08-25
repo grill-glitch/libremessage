@@ -266,7 +266,7 @@ fun MainScreen(
             ThreadDetailScreen(
                 threadId = route.threadId,
                 address = route.address,
-                sender = route.sender,
+                entrySender = route.sender,
                 initialAttachmentUri = route.attachmentUri,
                 initialBody = route.body,
                 vm = vm,

@@ -60,7 +60,11 @@ fun ThreadListPage(
         if (threads.isEmpty()) {
             item { EmptyBox(emptyText) }
         } else {
-            items(threads, key = { it.message.threadId }) { thread ->
+            // Key on threadId + address: groupThreads falls back to
+            // address.hashCode() for threadId=0 rows, so the raw threadId
+            // alone can collide across senders (LazyColumn would crash on
+            // duplicate keys).
+            items(threads, key = { "${it.message.threadId}:${it.message.address}" }) { thread ->
                 MessageItem(
                     thread = thread,
                     onClick = {

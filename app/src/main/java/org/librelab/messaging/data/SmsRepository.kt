@@ -55,7 +55,11 @@ class SmsRepository(private val context: Context) {
             .apply()
     }
 
-    /** Permanently delete a conversation (all its sms + mms rows). */
+    /**
+     * Permanently delete a conversation (all its sms + mms rows) plus any
+     * private outbox records of the thread — otherwise the deleted thread
+     * would keep resurfacing as a ghost row (loadAll merges the outbox).
+     */
     suspend fun deleteThread(threadId: Long): Boolean = withContext(Dispatchers.IO) {
         try {
             resolver.delete(
@@ -68,6 +72,9 @@ class SmsRepository(private val context: Context) {
                 "thread_id = ?",
                 arrayOf(threadId.toString())
             )
+            OutboxStore.all(context)
+                .filter { it.threadId == threadId }
+                .forEach { OutboxStore.remove(context, it.id) }
             true
         } catch (e: Exception) {
             false
@@ -423,18 +430,6 @@ class SmsRepository(private val context: Context) {
         }
     }
 
-    /**
-     * Digits-only, country code stripped for mainland numbers:
-     * "8618857133748" / "188 5713 3748" -> "18857133748".
-     * A redacted address ("+861****3748") only yields its visible digits
-     * ("8613748") — matched separately via [redactedMatches].
-     */
-    private fun normalizeNumber(n: String): String {
-        var d = n.filter { it.isDigit() }
-        if (d.length > 11 && d.startsWith("86")) d = d.drop(2)
-        return d
-    }
-
     private var contactNumberIndexMap: Map<String, ContactInfo>? = null
 
     /** All contact numbers keyed by normalized digits (built lazily, cached). */
@@ -523,6 +518,20 @@ fun smsIsSent(type: Int): Boolean = type == Telephony.Sms.MESSAGE_TYPE_SENT
 
 /** Whether an mms row is our own sent message (anything but inbox). */
 fun mmsIsSent(box: Int): Boolean = box != 1
+
+/**
+ * Digits-only, country code stripped for mainland numbers:
+ * "8618857133748" / "188 5713 3748" -> "18857133748".
+ * A redacted address ("+861****3748") only yields its visible digits
+ * ("8613748") — matched separately via [redactedMatches].
+ * Shared by the repository (app process) and the conversation widget
+ * (RemoteViews process) so both resolve contacts identically.
+ */
+fun normalizeNumber(n: String): String {
+    var d = n.filter { it.isDigit() }
+    if (d.length > 11 && d.startsWith("86")) d = d.drop(2)
+    return d
+}
 
 /**
  * Whether a redacted phone key — the visible digits of a masked address,

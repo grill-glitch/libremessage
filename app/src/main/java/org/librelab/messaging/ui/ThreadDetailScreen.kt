@@ -1,7 +1,6 @@
 package org.librelab.messaging.ui
 
 import android.Manifest
-import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -13,7 +12,6 @@ import android.os.Environment
 import android.provider.BlockedNumberContract
 import android.provider.ContactsContract
 import android.provider.MediaStore
-import android.telephony.SmsManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -119,8 +117,8 @@ import com.composables.icons.materialsymbols.outlined.Image
 import com.composables.icons.materialsymbols.outlined.More_vert
 import com.composables.icons.materialsymbols.outlined.Send
 import org.librelab.messaging.R
-import org.librelab.messaging.SmsSentReceiver
 import org.librelab.messaging.data.ContactInfo
+import org.librelab.messaging.data.MessageSender
 import org.librelab.messaging.data.PendingAttachment
 import org.librelab.messaging.data.SendStatus
 import org.librelab.messaging.data.SimCard
@@ -130,7 +128,6 @@ import org.librelab.messaging.ui.theme.AvatarColor
 import org.librelab.messaging.ui.theme.avatarColorFor
 import org.librelab.messaging.ui.components.ConfirmDialog
 import org.librelab.messaging.ui.components.MultiSelectActions
-import org.librelab.messaging.util.MmsSender
 import org.librelab.messaging.util.OutboxStore
 import org.librelab.messaging.util.formatBubbleTime
 import kotlinx.coroutines.Dispatchers
@@ -147,7 +144,7 @@ import java.io.File
 fun ThreadDetailScreen(
     threadId: Long,
     address: String,
-    sender: String,
+    entrySender: String,
     vm: SmsViewModel,
     onBack: () -> Unit,
     initialAttachmentUri: String = "",
@@ -159,6 +156,7 @@ fun ThreadDetailScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val sender = remember { MessageSender(context, vm) }
     var input by remember { mutableStateOf("") }
     var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
     var viewerUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -356,7 +354,7 @@ fun ThreadDetailScreen(
                             ?.let { it.contactName ?: it.sender.ifBlank { it.address } }
                             .orEmpty()
                         val titleText = if (isNewThread) newNumber
-                        else sender.ifBlank { inferredContact }.ifBlank { address }.ifBlank { newNumber }
+                        else entrySender.ifBlank { inferredContact }.ifBlank { address }.ifBlank { newNumber }
                         val ac = avatarColorFor(titleText)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             InitialAvatar(
@@ -535,18 +533,12 @@ fun ThreadDetailScreen(
                     // settings default (0 = system auto).
                     val useSubId = if (sendSubId > 0) sendSubId else effectiveSubId
                     val attachment = pendingAttachment
-                    val ok: Boolean
                     if (attachment != null) {
                         // MMS: keep our own outbox copy; the sent callback flips
                         // it to FAILED if the stack reports an error. Runs off
                         // the UI thread because MMS data may need enabling first.
-                        val outboxId = -System.currentTimeMillis()
-                        val sentIntent = sendResultIntent(context, "mms", outboxId)
-                        val scope2 = scope
-                        scope2.launch(Dispatchers.IO) {
-                            val sent = MmsSender.send(
-                                context, targetAddress, text, attachment, outboxId, sentIntent, useSubId
-                            ) != null
+                        scope.launch {
+                            val sent = sender.sendMms(targetAddress, text, attachment, useSubId) != null
                             withContext(Dispatchers.Main) {
                                 if (sent) {
                                     afterSendSuccess()
@@ -560,31 +552,18 @@ fun ThreadDetailScreen(
                             }
                         }
                         return@MessageInputBar
-                    } else {
-                        // SMS: insert our own outbox row (the system does not write
-                        // one on this ROM), then flip its type via the sent callback.
-                        val recordId = vm.insertPendingSms(targetAddress, text)
-                        val sentIntent = sendResultIntent(context, "sms", recordId)
-                        ok = try {
-                            val smsManager = if (useSubId > 0) {
-                                SmsManager.getSmsManagerForSubscriptionId(useSubId)
-                            } else {
-                                SmsManager.getDefault()
-                            }
-                            smsManager.sendTextMessage(targetAddress, null, text, sentIntent, null)
-                            true
-                        } catch (e: Exception) {
-                            vm.markSmsFailed(recordId)
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.toast_send_failed, e.message),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            false
-                        }
                     }
-                    if (ok) {
+                    // SMS: insert our own outbox row (the system does not write
+                    // one on this ROM), then flip its type via the sent callback.
+                    try {
+                        sender.sendSms(targetAddress, text, useSubId)
                         afterSendSuccess()
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_send_failed, e.message),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             )
@@ -803,22 +782,6 @@ private fun shareText(context: Context, text: String) {
     }
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_chooser_title)))
 }
-
-/**
- * Send-result callback PendingIntent — shared by the SMS and MMS send
- * paths (SmsSentReceiver flips the provider row / outbox record on the
- * delivery result).
- */
-private fun sendResultIntent(context: Context, type: String, recordId: Long): PendingIntent =
-    PendingIntent.getBroadcast(
-        context,
-        recordId.toInt(),
-        Intent(SmsSentReceiver.ACTION_SMS_SENT)
-            .setPackage(context.packageName)
-            .putExtra(SmsSentReceiver.EXTRA_TYPE, type)
-            .putExtra(SmsSentReceiver.EXTRA_RECORD_ID, recordId),
-        PendingIntent.FLAG_IMMUTABLE
-    )
 
 /**
  * Open the system contact editor pre-filled with this number, so the user

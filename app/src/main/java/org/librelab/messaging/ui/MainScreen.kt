@@ -80,7 +80,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -607,7 +606,6 @@ private fun SmsListContent(
     onRestoreMute: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val scope = rememberCoroutineScope()
     val filters = remember { SmsFilter.entries.toList() }
     val pagerState = rememberPagerState(initialPage = filters.indexOf(state.filter)) { filters.size }
 
@@ -635,12 +633,12 @@ private fun SmsListContent(
         if (pagerState.isScrollInProgress) userSwiped = true
     }
 
-    // External filter changes (settings shortcut, deep link) move the pager
-    // to the matching page.
+    // Filter changes (tab tap, launcher shortcut, deep link) move the pager
+    // to the matching page with the standard M3 slide.
     LaunchedEffect(state.filter) {
         val idx = filters.indexOf(state.filter)
         if (idx >= 0 && idx != pagerState.currentPage) {
-            pagerState.scrollToPage(idx)
+            pagerState.animateScrollToPage(idx)
         }
     }
 
@@ -672,17 +670,13 @@ private fun SmsListContent(
             )
         }
 
-        // Filter chips pinned on top; swiping the content below switches the
-        // active category, and tapping a chip animates the pager to it.
-        // The sliding indicator under the chips follows the drag so the
-        // highlight moves with the finger.
+        // Category tabs: standard Material 3 TabRow driving the same pager.
+        // selectedTabIndex comes from the real pager state, and tapping a
+        // tab applies the actual filter; the LaunchedEffect(state.filter)
+        // below moves the pager to the matching page.
         FilterChipRow(
-            page = pagerState.currentPage,
-            pageOffset = pagerState.currentPageOffsetFraction,
-            onSelect = { filter ->
-                onFilter(filter)
-                scope.launch { pagerState.animateScrollToPage(filters.indexOf(filter)) }
-            }
+            selectedTabIndex = pagerState.currentPage,
+            onTabSelected = { index -> onFilter(filters[index]) }
         )
 
         HorizontalPager(

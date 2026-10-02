@@ -11,6 +11,7 @@ import org.librelab.messaging.data.MessageCategory
 import org.librelab.messaging.data.SettingsStore
 import org.librelab.messaging.data.SmsParser
 import org.librelab.messaging.data.isAntiBombActive
+import org.librelab.messaging.data.joinSmsSegments
 import org.librelab.messaging.util.copyCodeToClipboard
 
 /**
@@ -30,14 +31,19 @@ class SmsReceiver : BroadcastReceiver() {
         ) {
             return
         }
-        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
-        val sms = messages.firstOrNull() ?: return
-        val body = sms.displayMessageBody ?: return
+        val segments = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
+        // A long SMS is delivered as several PDUs — one SmsMessage per
+        // 67/70-character segment. Using only the first one cut the
+        // message at the first segment boundary, so join them all in PDU
+        // order to get the full body.
+        val body = joinSmsSegments(segments.map { it.displayMessageBody })
+        if (body.isEmpty()) return
+        val sms = segments.first()
         val address = sms.originatingAddress ?: context.getString(R.string.unknown_sender)
         if (!dedup(address, body)) return
         // Default SMS app: persist the SMS_DELIVER message, then notify.
         if (action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
-            insertInbox(context, sms)
+            insertInbox(context, sms, body)
         }
         // Home-screen widgets read the SMS table directly: nudge them so a
         // fresh code/thread appears without waiting for the 30-min tick.
@@ -68,11 +74,11 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun insertInbox(context: Context, sms: android.telephony.SmsMessage) {
+    private fun insertInbox(context: Context, sms: android.telephony.SmsMessage, body: String) {
         try {
             val values = ContentValues().apply {
                 put(Telephony.Sms.ADDRESS, sms.originatingAddress)
-                put(Telephony.Sms.BODY, sms.displayMessageBody)
+                put(Telephony.Sms.BODY, body)
                 put(Telephony.Sms.DATE, sms.timestampMillis)
                 put(Telephony.Sms.READ, 0)
                 put(Telephony.Sms.SEEN, 0)

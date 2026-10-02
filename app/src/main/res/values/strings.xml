@@ -41,6 +41,9 @@
     <string name="action_block_number">Block number</string>
     <string name="block_number_unavailable">This number cannot be blocked on this device</string>
     <string name="action_dial">Call</string>
+    <string name="action_call">Call</string>
+    <string name="action_send_sms">Send SMS</string>
+    <string name="action_open_link">Open link</string>
     <string name="action_multi_select">Multi-select</string>
     <string name="action_save_image">Save image</string>
     <string name="action_remove_image">Remove image</string>
@@ -127,6 +130,8 @@
     <string name="toast_more_wip">More features coming soon</string>
     <string name="toast_no_contact_app">No contacts app found</string>
     <string name="toast_read_image_failed">Failed to read image</string>
+    <string name="toast_no_dialer">No dialer app found</string>
+    <string name="toast_no_browser">No browser app found</string>
 
     <!-- Dialogs -->
     <string name="dialog_delete_thread_title">Delete conversation?</string>

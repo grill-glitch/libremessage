@@ -14,7 +14,17 @@ package org.librelab.messaging.data
 object SmsParser {
 
     // 4-8 digit sequence not embedded in a longer number
-    private val CODE_PATTERN = Regex("(?<!\\d)\\d{4,8}(?!\\d)")
+    /**
+     * The bare-digit-run shape this matcher works on — the single definition
+     * of "how long a standalone digit run is". Other digit-reading rules must
+     * stay *inside* this window: a run this parser cannot report is a run it
+     * can never exempt from linkification. See
+     * [MessageLinks.SHORT_CODE_MIN]/[MessageLinks.SHORT_CODE_MAX].
+     */
+    const val CODE_RUN_MIN = 4
+    const val CODE_RUN_MAX = 8
+
+    private val CODE_PATTERN = Regex("(?<!\\d)\\d{$CODE_RUN_MIN,$CODE_RUN_MAX}(?!\\d)")
 
     // Express pickup code: 【韵达快递】凭15-2-1300到采荷百合路11号驿站取运单尾号1300包裹
     // 【多多代收点】您有2个包裹在采荷百合路11号驿站,取货码1-3-9448、5-4-3216

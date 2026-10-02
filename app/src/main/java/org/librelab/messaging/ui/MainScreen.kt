@@ -269,7 +269,10 @@ fun MainScreen(
                 initialAttachmentUri = route.attachmentUri,
                 initialBody = route.body,
                 vm = vm,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                // "发短信" from the tap-a-number chooser: open a draft for
+                // that number (threadId=0 → recipient prefilled, picker shown).
+                onComposeTo = { number -> navController.navigate(ThreadRoute(0L, number, "")) }
             )
         }
 

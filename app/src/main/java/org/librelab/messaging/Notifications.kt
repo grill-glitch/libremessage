@@ -7,11 +7,13 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Telephony
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.librelab.messaging.R
+import org.librelab.messaging.data.MessageLinks
 import org.librelab.messaging.data.SmsParser
 
 /** Notification helpers for the incoming-SMS receiver. */
@@ -19,6 +21,15 @@ object Notifications {
 
     const val CHANNEL_SMS = "incoming_sms"
     private const val EXTRA_CODE = "code"
+
+    // PendingIntent identity is (requestCode, Intent filterEquals), so each
+    // action keeps a stable code: re-posting a notification for the same
+    // sender updates its actions instead of stacking duplicates.
+    private const val REQ_CONTENT = 0
+    private const val REQ_COPY_CODE = 1
+    private const val REQ_OPEN_LINK = 2
+    private const val REQ_DIAL = 3
+    private const val REQ_SMS = 4
 
     private fun ensureChannel(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -40,7 +51,7 @@ object Notifications {
         ensureChannel(context)
 
         val contentIntent = PendingIntent.getActivity(
-            context, 0,
+            context, REQ_CONTENT,
             Intent(context, MainActivity::class.java)
                 .setAction(MainActivity.ACTION_OPEN_THREAD)
                 .putExtra(MainActivity.EXTRA_ADDRESS, address)
@@ -60,11 +71,53 @@ object Notifications {
             .setShowWhen(true)
             .setWhen(System.currentTimeMillis())
 
+        // Action row, only for what the message actually carries: a web link
+        // to open in the browser, and — when the sender is a dialable number —
+        // call / reply straight from the notification.
+        MessageLinks.firstUrl(body)?.let { url ->
+            val openIntent = PendingIntent.getActivity(
+                context, REQ_OPEN_LINK,
+                Intent(Intent.ACTION_VIEW, Uri.parse(MessageLinks.toUrl(url)))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(0, context.getString(R.string.action_open_link), openIntent)
+        }
+
+        if (MessageLinks.isPhoneNumber(address)) {
+            val number = MessageLinks.normalizePhone(address)
+            val dialIntent = PendingIntent.getActivity(
+                context, REQ_DIAL,
+                Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(0, context.getString(R.string.action_call), dialIntent)
+
+            // Explicit target so the reply draft opens in this app (which is
+            // also the default SMS handler); MainActivity's smsto: handling
+            // pre-fills the recipient.
+            val smsIntent = PendingIntent.getActivity(
+                context, REQ_SMS,
+                Intent(context, MainActivity::class.java)
+                    .setAction(Intent.ACTION_SENDTO)
+                    .setData(Uri.fromParts("smsto", number, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(0, context.getString(R.string.action_send_sms), smsIntent)
+        }
+
         val code = SmsParser.extractCode(body)
         if (code != null) {
+            // The code rides in the Intent *data*: PendingIntent identity
+            // ignores extras, so without it a second code notification would
+            // reuse this one and the button would copy the other code.
             val copyIntent = PendingIntent.getBroadcast(
-                context, 1,
-                Intent(context, CopyCodeReceiver::class.java).putExtra(EXTRA_CODE, code),
+                context, REQ_COPY_CODE,
+                Intent(context, CopyCodeReceiver::class.java)
+                    .setData(Uri.parse("librelab:copycode/$code"))
+                    .putExtra(EXTRA_CODE, code),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             builder.addAction(0, context.getString(R.string.copy_code), copyIntent)

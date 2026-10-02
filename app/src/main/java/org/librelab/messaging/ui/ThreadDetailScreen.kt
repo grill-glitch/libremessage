@@ -54,7 +54,6 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -90,8 +89,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -118,6 +122,7 @@ import com.composables.icons.materialsymbols.outlined.More_vert
 import com.composables.icons.materialsymbols.outlined.Send
 import org.librelab.messaging.R
 import org.librelab.messaging.data.ContactInfo
+import org.librelab.messaging.data.MessageLinks
 import org.librelab.messaging.data.MessageSender
 import org.librelab.messaging.data.PendingAttachment
 import org.librelab.messaging.data.SendStatus
@@ -129,6 +134,7 @@ import org.librelab.messaging.ui.theme.avatarColorFor
 import org.librelab.messaging.ui.components.ConfirmDialog
 import org.librelab.messaging.ui.components.MultiSelectActions
 import org.librelab.messaging.util.OutboxStore
+import org.librelab.messaging.util.copyCodeToClipboard
 import org.librelab.messaging.util.formatBubbleTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -148,6 +154,9 @@ fun ThreadDetailScreen(
     entrySender: String,
     vm: SmsViewModel,
     onBack: () -> Unit,
+    // Opens a fresh draft addressed to a number tapped inside a bubble
+    // (the "发短信" half of the tap-a-number chooser).
+    onComposeTo: (String) -> Unit = {},
     initialAttachmentUri: String = "",
     initialBody: String = ""
 ) {
@@ -662,7 +671,17 @@ fun ThreadDetailScreen(
                     onDelete = { msg ->
                         deleteMessage(context, msg)
                         vm.refresh()
-                    }
+                    },
+                    // Link tapped in the bubble → default browser.
+                    onOpenLink = { url -> openUrl(context, url) },
+                    // Number tapped in the bubble → context menu at the finger
+                    // (inside the bubble), whose two items land here.
+                    onCallNumber = { number -> startDial(context, number) },
+                    onMessageNumber = { number -> onComposeTo(number) },
+                    // Code tapped in the bubble → straight to the clipboard,
+                    // same toast and same path as the code list and the
+                    // notification's copy action.
+                    onCopyCode = { code -> copyCodeToClipboard(context, code) }
                 )
             }
             }
@@ -827,6 +846,35 @@ private fun blockNumber(context: Context, number: String) {
         }
 }
 
+/**
+ * Open a detected link with whatever app handles the scheme (the default
+ * browser for http/https). `www.`-style and bare-domain links get an
+ * explicit http scheme first.
+ */
+private fun openUrl(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(MessageLinks.toUrl(url)))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            Toast.makeText(context, R.string.toast_no_browser, Toast.LENGTH_SHORT).show()
+        }
+}
+
+/**
+ * Open the system dialer pre-filled with the number. ACTION_DIAL needs no
+ * CALL_PHONE permission and never places the call by itself — the user
+ * stays in control of the final tap.
+ */
+private fun startDial(context: Context, number: String) {
+    val dialable = MessageLinks.normalizePhone(number).ifBlank { number }
+    val intent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", dialable, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            Toast.makeText(context, R.string.toast_no_dialer, Toast.LENGTH_SHORT).show()
+        }
+}
+
 /** Copy an MMS part into the gallery (Pictures/Librelab). */
 private fun saveImageToGallery(context: Context, uri: android.net.Uri): Boolean = try {
     val resolver = context.contentResolver
@@ -886,7 +934,11 @@ private fun MessageBubble(
     onStartMultiSelect: (SmsMessage) -> Unit = {},
     onOpenImage: (android.net.Uri) -> Unit,
     onSaveImage: (android.net.Uri) -> Unit,
-    onDelete: (SmsMessage) -> Unit
+    onDelete: (SmsMessage) -> Unit,
+    onOpenLink: (String) -> Unit = {},
+    onCallNumber: (String) -> Unit = {},
+    onMessageNumber: (String) -> Unit = {},
+    onCopyCode: (String) -> Unit = {}
 ) {
     val time = formatBubbleTime(message.date)
     val hasImages = message.imageUris.isNotEmpty() || message.attachmentName != null
@@ -936,7 +988,11 @@ private fun MessageBubble(
                         multiSelect = multiSelect,
                         onToggle = { onToggleSelect(message.key) },
                         onStartMultiSelect = { onStartMultiSelect(message) },
-                        onRequestDelete = { confirmDelete = true }
+                        onRequestDelete = { confirmDelete = true },
+                        onOpenLink = onOpenLink,
+                        onCallNumber = onCallNumber,
+                        onMessageNumber = onMessageNumber,
+                        onCopyCode = onCopyCode
                     )
                 } else if (hasImages) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1009,7 +1065,11 @@ private fun MessageBubble(
                         multiSelect = multiSelect,
                         onToggle = { onToggleSelect(message.key) },
                         onStartMultiSelect = { onStartMultiSelect(message) },
-                        onRequestDelete = { confirmDelete = true }
+                        onRequestDelete = { confirmDelete = true },
+                        onOpenLink = onOpenLink,
+                        onCallNumber = onCallNumber,
+                        onMessageNumber = onMessageNumber,
+                        onCopyCode = onCopyCode
                     )
                 } else if (hasImages) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1166,9 +1226,23 @@ private fun BubbleContent(
     multiSelect: Boolean = false,
     onToggle: () -> Unit = {},
     onStartMultiSelect: () -> Unit = {},
-    onRequestDelete: () -> Unit
+    onRequestDelete: () -> Unit,
+    onOpenLink: (String) -> Unit = {},
+    onCallNumber: (String) -> Unit = {},
+    onMessageNumber: (String) -> Unit = {},
+    onCopyCode: (String) -> Unit = {}
 ) {
     var menuAt by remember { mutableStateOf<Offset?>(null) }
+    // Number tapped in the body: (number, tap position) → context menu popped
+    // at the finger, same interaction as the long-press message menu.
+    var phoneMenu by remember { mutableStateOf<Pair<String, Offset>?>(null) }
+    // The body text sits inside the bubble's 14dp/10dp content padding, so a
+    // tap position local to the Text has to be shifted by that much to land
+    // correctly in the Box that hosts the popup.
+    val density = LocalDensity.current
+    val textOrigin = remember(density) {
+        with(density) { Offset(14.dp.toPx(), 10.dp.toPx()) }
+    }
     Box {
         Surface(
             shape = shape,
@@ -1182,10 +1256,15 @@ private fun BubbleContent(
             }
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Text(
-                    text = message.body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = content
+                LinkifiedText(
+                    body = message.body,
+                    textColor = content,
+                    multiSelect = multiSelect,
+                    onToggle = onToggle,
+                    onLongPress = { menuAt = it },
+                    onOpenLink = onOpenLink,
+                    onPhone = { number, at -> phoneMenu = number to (at + textOrigin) },
+                    onCopyCode = onCopyCode
                 )
                 Spacer(Modifier.size(4.dp))
                 Row(
@@ -1212,7 +1291,100 @@ private fun BubbleContent(
                 onRequestDelete = onRequestDelete
             )
         }
+        phoneMenu?.let { (number, at) ->
+            Popup(
+                offset = IntOffset(at.x.roundToInt(), at.y.roundToInt()),
+                onDismissRequest = { phoneMenu = null }
+            ) {
+                DropdownMenu(expanded = true, onDismissRequest = { phoneMenu = null }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_call)) },
+                        onClick = {
+                            phoneMenu = null
+                            onCallNumber(number)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_send_sms)) },
+                        onClick = {
+                            phoneMenu = null
+                            onMessageNumber(number)
+                        }
+                    )
+                }
+            }
+        }
     }
+}
+
+/**
+ * Message body with web links, phone numbers and codes rendered as tappable
+ * spans (underlined + primary-colored, the standard link affordance — one
+ * rule for every kind, so nothing looks tappable that is not). A tap on a
+ * link opens the browser, a tap on a number reports the number together with
+ * the tap position so the caller can pop its context menu right there, and a
+ * tap on a code (verification or pickup) copies it to the clipboard. A tap
+ * anywhere else is a no-op, so the previous bubble behaviour is untouched.
+ * In multi-select mode the tap toggles selection instead.
+ *
+ * The ranges come from [MessageLinks] and are hit-tested through the layout
+ * result, which keeps the long-press action menu (owned by the bubble)
+ * working for presses that do not land on a span.
+ */
+@Composable
+private fun LinkifiedText(
+    body: String,
+    textColor: androidx.compose.ui.graphics.Color,
+    multiSelect: Boolean = false,
+    onToggle: () -> Unit = {},
+    onLongPress: (Offset) -> Unit = {},
+    onOpenLink: (String) -> Unit = {},
+    // (number, tap position inside this text)
+    onPhone: (String, Offset) -> Unit = { _, _ -> },
+    // The parser's normalised code, not the span text: "123 456" copies as
+    // "123456", which is what a code field accepts.
+    onCopyCode: (String) -> Unit = {}
+) {
+    val links = remember(body) { MessageLinks.find(body) }
+    val linkColor = MaterialTheme.colorScheme.primary
+    val annotated = remember(body, links, linkColor) {
+        buildAnnotatedString {
+            append(body)
+            links.forEach { link ->
+                addStyle(
+                    SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
+                    link.start,
+                    link.end
+                )
+            }
+        }
+    }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        text = annotated,
+        style = MaterialTheme.typography.bodyMedium,
+        color = textColor,
+        onTextLayout = { layout = it },
+        modifier = Modifier.pointerInput(links, multiSelect) {
+            detectTapGestures(
+                onTap = { pos ->
+                    if (multiSelect) {
+                        onToggle()
+                        return@detectTapGestures
+                    }
+                    val offset = layout?.getOffsetForPosition(pos) ?: return@detectTapGestures
+                    val hit = links.firstOrNull { offset >= it.start && offset < it.end }
+                    when (hit?.kind) {
+                        MessageLinks.Kind.URL -> onOpenLink(hit.text)
+                        MessageLinks.Kind.PHONE -> onPhone(hit.text, pos)
+                        MessageLinks.Kind.CODE -> onCopyCode(hit.value)
+                        null -> Unit
+                    }
+                },
+                onLongPress = { if (multiSelect) onToggle() else onLongPress(it) }
+            )
+        }
+    )
 }
 
 /** Compact action menu popped at the long-press position; tap outside dismisses. */

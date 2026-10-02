@@ -38,7 +38,16 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 (code shrinking + optimization + obfuscation) for release only.
+            // Debug stays unminified so the debugger/stack traces work as-is.
+            // Rules: AGP's bundled proguard-android-optimize.txt (standard
+            // Android keeps: manifest components, Views, Parcelables, enums…)
+            // plus app/proguard-rules.pro for app-specific needs.
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             if (keystoreProps.isNotEmpty()) {
                 signingConfig = signingConfigs.getByName("release")
             }
